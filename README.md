@@ -16,7 +16,7 @@ This repository implements an **interactive k-regret minimization** algorithm ta
 
 ```
 ├── datasets/            # Example datasets
-├── script/             # preprocessing scripts
+├── script.py            # script for standard experimental results
 ├── highdim.cpp          # Core algorithm implementation
 ├── attribute_subset.cpp # our proposed attribute subset method
 ├── sphere.cpp           # the code for the applied k-regret minimization algorithm
@@ -37,8 +37,8 @@ This repository implements an **interactive k-regret minimization** algorithm ta
 
 ## Reproducibility:
 
-To reproduce the experiments in the paper 'High-dimensional Regret Minimization' please consult EXPERIMENTS.txt for exact command line options. For example,
+To reproduce the experiments in the paper 'High-dimensional Regret Minimization', use 
 
-./run datasets/e100-100000.txt 5 30
+python script.py <dataset_path> <d_prime> <d_hat_1> <d_hat_2> <rounds>
 
-will run the code with a dimension cover of size 5, and 30 repeated-samples in Phase 3 on the dataset e100-100000.txt (in the datasets/ folder) with all other parameters as default.
+which will run the code 100 times and report the average performance, with the parameters above and all other parameters as default.
