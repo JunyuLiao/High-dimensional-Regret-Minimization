@@ -1,0 +1,35 @@
+# Ignore dataset, output, and plot folders
+datasets/
+output/
+plot/
+
+# macOS system files
+.DS_Store
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.so
+
+# Conda/venv
+env/
+.venv/
+*.env
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# VSCode and IDE settings
+.vscode/
+.idea/
+
+# Executables and object files
+*.out
+*.o
+*.exe
+run
+run_debug
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
