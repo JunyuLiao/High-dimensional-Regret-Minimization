@@ -33,3 +33,5 @@ run_debug
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
+
+run.dSYM/
