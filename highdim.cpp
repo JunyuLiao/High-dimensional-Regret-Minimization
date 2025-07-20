@@ -74,7 +74,6 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
         exit(1);
     }
     int d_target = d_bar;
-    printf("d_left: %d, d_target: %d\n", d_left, d_target);
 	while (d_left > 0 && num_questions > 0 && final_dimensions.size() < d_bar){
         d_left = selected_dimensions.size();
 		if (d_left <= 2*d_target-2){
@@ -267,7 +266,8 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
                                 selected_dimensions.erase(next(selected_dimensions.begin(), left));
                                 d_left -= 1;
                             }
-                            left = mid+1;
+                            // left = mid+1;
+                            right = right - mid + left - 1; // adjust the right pointer (since we are now operating a set)
                         }
                         else {
                             // the dimension is in the left half, however cannot remove dimensions in the right half
@@ -287,7 +287,7 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
     // printf("Phase 3\n"); // 444
 	// take the union of the final_dimensions and the selected_dimensions
 	std::set<int> set_final_dimensions;
-    if (selected_dimensions.size() == 0){
+    if (selected_dimensions.size() == 0 || final_dimensions.size() == d_bar){
         set_final_dimensions = final_dimensions;
     }
     else {
@@ -299,6 +299,7 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
 	point_set_t* S_output = nullptr;
 
 	int final_d = set_final_dimensions.size();
+    printf("number of final dimensions: %d\n", final_d);
 	point_set_t* D_prime = alloc_point_set(n);
 	for (int j=0;j<n;++j){
 		D_prime->points[j] = alloc_point(final_d);
@@ -332,7 +333,16 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
             exit(1);
         }
         printf("Applying the attribute subset method to output a regret minimizing subset\n");
-        S_output = attribute_subset(skyline, S_output, final_d, d_hat_2, K, set_final_dimensions);
+        if (final_d <= d_hat_2){
+            point_set_t* S = sphereWSImpLP(skyline_D_prime, d_hat_2);
+            S_output = alloc_point_set(S->numberOfPoints);
+            for (int j = 0; j < S->numberOfPoints; ++j){
+                S_output->points[j] = skyline->points[S->points[j]->id];
+            }
+        }
+        else {
+            S_output = attribute_subset(skyline, S_output, final_d, d_hat_2, K, set_final_dimensions);
+        }
 	}
     //also return the information about the dimensions chosen, as stored in set_final_dimensions
     highdim_output* output = new highdim_output;

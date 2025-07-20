@@ -5,23 +5,73 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Default parameters
+# Configuration
 dataset_path = "datasets/e100-10k.txt"
-d_prime = 3
-d_hat_1_values = [5, 6, 7, 8, 9, 10]  # Values to sweep
-d_hat_2 = 7
-K = 30
-num_q = 150
+
+# Parameter to vary - change this to experiment with different parameters
+VARY_PARAM = "d_prime"  # Options: "d_hat_1", "d_hat_2", "d_prime", "K", "num_q"
+
+# Default parameters (will be overridden by the varied parameter)
+default_params = {
+    "d_prime": 3,
+    "d_hat_1": 8,
+    "d_hat_2": 8,
+    "K": 30,
+    "num_q": 20
+}
+
+# Define parameter ranges for each parameter
+param_ranges = {
+    "d_prime": [2, 3, 4, 5],
+    "d_hat_1": [5, 6, 7, 8, 9, 10],
+    "d_hat_2": [5, 6, 7, 8, 9, 10],
+    "K": [20, 30, 40, 50],
+    "num_q": [15, 17, 19, 21, 23, 25, 27, 30]
+}
+
+# Number of runs per parameter value
+NUM_RUNS = 10
 
 def mean(lst):
     return sum(lst) / len(lst) if lst else float('nan')
 
-# Store results for all d_hat_1 values
+def get_command(param_value):
+    """Generate command with the specified parameter value"""
+    params = default_params.copy()
+    params[VARY_PARAM] = param_value
+    
+    return ["./run", dataset_path, 
+            str(params["d_prime"]), 
+            str(params["d_hat_1"]), 
+            str(params["d_hat_2"]), 
+            str(params["K"]), 
+            str(params["num_q"])]
+
+def get_plot_title(param_name):
+    """Get appropriate plot titles based on parameter"""
+    titles = {
+        "d_hat_1": "d̂₁",
+        "d_hat_2": "d̂₂", 
+        "d_prime": "d'",
+        "K": "K",
+        "num_q": "Number of Questions"
+    }
+    return titles.get(param_name, param_name)
+
+# Get values to test
+param_values = param_ranges[VARY_PARAM]
+print(f"Varying parameter: {VARY_PARAM}")
+print(f"Testing values: {param_values}")
+print(f"Default parameters: {default_params}")
+
+# Store results for all parameter values
 all_results = {}
 
-# Iterate over d_hat_1 values
-for d_hat_1 in d_hat_1_values:
-    command = ["./run", dataset_path, str(d_prime), str(d_hat_1), str(d_hat_2), str(K), str(num_q)]
+# Iterate over parameter values
+for param_value in param_values:
+    command = get_command(param_value)
+    print(f"\nTesting {VARY_PARAM} = {param_value}")
+    print(f"Command: {' '.join(command)}")
 
     stats = {
         "attr_subset_count": 0,
@@ -42,11 +92,17 @@ for d_hat_1 in d_hat_1_values:
     }
 
     # Execution loop with progress bar
-    for _ in tqdm(range(10), desc=f"d_hat_1 = {d_hat_1}"):
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    for run_idx in tqdm(range(NUM_RUNS), desc=f"{VARY_PARAM} = {param_value}"):
+        try:
+            result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=60)
+        except subprocess.TimeoutExpired:
+            print(f"Run {run_idx + 1} timed out, skipping...")
+            continue
 
         if result.returncode != 0:
-            print(f"Command failed with return code {result.returncode}")
+            print(f"Run {run_idx + 1} failed with return code {result.returncode}")
+            if result.stderr:
+                print(f"Error: {result.stderr}")
             continue
 
         output = result.stdout.lower()
@@ -96,11 +152,11 @@ for d_hat_1 in d_hat_1_values:
                 except ValueError:
                     continue
 
-    # Store results for this d_hat_1 value
-    all_results[d_hat_1] = stats
+    # Store results for this parameter value
+    all_results[param_value] = stats
 
-    # Report for this d_hat_1
-    print(f"\n===== Results for d_hat_1 = {d_hat_1} =====")
+    # Report for this parameter value
+    print(f"\n===== Results for {VARY_PARAM} = {param_value} =====")
 
     # Attribute Subset Summary
     asc = stats["attr_subset_count"]
@@ -127,7 +183,7 @@ for d_hat_1 in d_hat_1_values:
 print("\n===== Creating Plots =====")
 
 # Prepare data for plotting
-d_hat_1_list = []
+param_list = []
 attr_avg_questions = []
 attr_avg_rounds = []
 attr_sphere_rr = []
@@ -135,10 +191,10 @@ attr_attsub_rr = []
 attr_win_rates = []
 interactive_avg_questions = []
 
-for d_hat_1 in d_hat_1_values:
-    if d_hat_1 in all_results:
-        stats = all_results[d_hat_1]
-        d_hat_1_list.append(d_hat_1)
+for param_value in param_values:
+    if param_value in all_results:
+        stats = all_results[param_value]
+        param_list.append(param_value)
         
         # Attribute subset metrics
         if stats["attr_subset_count"] > 0:
@@ -161,65 +217,66 @@ for d_hat_1 in d_hat_1_values:
             interactive_avg_questions.append(np.nan)
 
 # Create subplots
+param_title = get_plot_title(VARY_PARAM)
 fig, axes = plt.subplots(2, 3, figsize=(15, 10))
-fig.suptitle('Results vs d_hat_1 Values', fontsize=16)
+fig.suptitle(f'Results vs {param_title} Values', fontsize=16)
 
 # Plot 1: Average Questions (Attribute Subset)
-axes[0, 0].plot(d_hat_1_list, attr_avg_questions, 'bo-', linewidth=2, markersize=8)
+axes[0, 0].plot(param_list, attr_avg_questions, 'bo-', linewidth=2, markersize=8)
 axes[0, 0].set_title('Attribute Subset: Avg Questions')
-axes[0, 0].set_xlabel('d_hat_1')
+axes[0, 0].set_xlabel(param_title)
 axes[0, 0].set_ylabel('Average Questions')
 axes[0, 0].grid(True, alpha=0.3)
 
 # Plot 2: Average Rounds (Attribute Subset)
-axes[0, 1].plot(d_hat_1_list, attr_avg_rounds, 'go-', linewidth=2, markersize=8)
+axes[0, 1].plot(param_list, attr_avg_rounds, 'go-', linewidth=2, markersize=8)
 axes[0, 1].set_title('Attribute Subset: Avg Rounds')
-axes[0, 1].set_xlabel('d_hat_1')
+axes[0, 1].set_xlabel(param_title)
 axes[0, 1].set_ylabel('Average Rounds')
 axes[0, 1].grid(True, alpha=0.3)
 
 # Plot 3: Regret Ratio Comparison
-axes[0, 2].plot(d_hat_1_list, attr_sphere_rr, 'ro-', linewidth=2, markersize=8, label='Sphere RR')
-axes[0, 2].plot(d_hat_1_list, attr_attsub_rr, 'bo-', linewidth=2, markersize=8, label='Attsub RR')
+axes[0, 2].plot(param_list, attr_sphere_rr, 'ro-', linewidth=2, markersize=8, label='Sphere RR')
+axes[0, 2].plot(param_list, attr_attsub_rr, 'bo-', linewidth=2, markersize=8, label='Attsub RR')
 axes[0, 2].set_title('Regret Ratio Comparison')
-axes[0, 2].set_xlabel('d_hat_1')
+axes[0, 2].set_xlabel(param_title)
 axes[0, 2].set_ylabel('Regret Ratio')
 axes[0, 2].legend()
 axes[0, 2].grid(True, alpha=0.3)
 
 # Plot 4: Attsub Win Rate
-axes[1, 0].plot(d_hat_1_list, [wr * 100 for wr in attr_win_rates], 'mo-', linewidth=2, markersize=8)
+axes[1, 0].plot(param_list, [wr * 100 for wr in attr_win_rates], 'mo-', linewidth=2, markersize=8)
 axes[1, 0].set_title('Attsub Win Rate')
-axes[1, 0].set_xlabel('d_hat_1')
+axes[1, 0].set_xlabel(param_title)
 axes[1, 0].set_ylabel('Win Rate (%)')
 axes[1, 0].grid(True, alpha=0.3)
 
 # Plot 5: Interactive Average Questions
-axes[1, 1].plot(d_hat_1_list, interactive_avg_questions, 'co-', linewidth=2, markersize=8)
+axes[1, 1].plot(param_list, interactive_avg_questions, 'co-', linewidth=2, markersize=8)
 axes[1, 1].set_title('Interactive: Avg Questions')
-axes[1, 1].set_xlabel('d_hat_1')
+axes[1, 1].set_xlabel(param_title)
 axes[1, 1].set_ylabel('Average Questions')
 axes[1, 1].grid(True, alpha=0.3)
 
 # Plot 6: Summary comparison
-axes[1, 2].plot(d_hat_1_list, attr_avg_questions, 'bo-', linewidth=2, markersize=8, label='Attr Subset')
-axes[1, 2].plot(d_hat_1_list, interactive_avg_questions, 'ro-', linewidth=2, markersize=8, label='Interactive')
+axes[1, 2].plot(param_list, attr_avg_questions, 'bo-', linewidth=2, markersize=8, label='Attr Subset')
+axes[1, 2].plot(param_list, interactive_avg_questions, 'ro-', linewidth=2, markersize=8, label='Interactive')
 axes[1, 2].set_title('Questions: Attr Subset vs Interactive')
-axes[1, 2].set_xlabel('d_hat_1')
+axes[1, 2].set_xlabel(param_title)
 axes[1, 2].set_ylabel('Average Questions')
 axes[1, 2].legend()
 axes[1, 2].grid(True, alpha=0.3)
 
 plt.tight_layout()
-plt.savefig('plot/d_hat_1_results.png', dpi=300, bbox_inches='tight')
+plot_filename = f'plot/{VARY_PARAM}_results.png'
+plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
 plt.show()
 
-print("Plots saved as 'd_hat_1_results.png'")
+print(f"Plots saved as '{plot_filename}'")
 
 # Print summary table
-print("\n===== Summary Table =====")
-print("d_hat_1 | Attr Questions | Attr Rounds | Sphere RR  | Attsub RR  | Win Rate | Interactive Q")
+print(f"\n===== Summary Table =====")
+print(f"{param_title:>7} | Attr Questions | Attr Rounds | Sphere RR  | Attsub RR  | Win Rate | Interactive Q")
 print("--------|----------------|-------------|------------|------------|----------|-------------")
-for i, d_hat_1 in enumerate(d_hat_1_list):
-    print(f"{d_hat_1:7} | {attr_avg_questions[i]:13.2f} | {attr_avg_rounds[i]:10.2f} | {attr_sphere_rr[i]:9.6f} | {attr_attsub_rr[i]:9.6f} | {attr_win_rates[i]*100:7.1f}% | {interactive_avg_questions[i]:11.2f}")
-
+for i, param_value in enumerate(param_list):
+    print(f"{param_value:7} | {attr_avg_questions[i]:13.2f} | {attr_avg_rounds[i]:10.2f} | {attr_sphere_rr[i]:9.6f} | {attr_attsub_rr[i]:9.6f} | {attr_win_rates[i]*100:7.1f}% | {interactive_avg_questions[i]:11.2f}")

@@ -4,6 +4,11 @@ using namespace std;
 
 
 point_set_t* attribute_subset(point_set_t* skyline, point_set_t* S_output, int final_d, int d_hat_2, int K, std::set<int> set_final_dimensions){
+    if (final_d < d_hat_2){
+        // error: final_d < d_hat_2
+        printf("error: final_d < d_hat_2\n");
+        exit(1);
+    }
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::mt19937 generator(seed);
     std::uniform_int_distribution<int> distribution(0, final_d-1);
@@ -12,6 +17,11 @@ point_set_t* attribute_subset(point_set_t* skyline, point_set_t* S_output, int f
 
     while (S_output == nullptr || S_output->numberOfPoints < K){
         num_rounds++;
+        if (num_rounds > 30){
+            // exit if the number of rounds exceeds 30
+            printf("rounds exceeded 30, exiting...\n");
+            break;
+        }
         //randomly select d_hat dimensions
         std::set<int> selected_dimensions;
         while (selected_dimensions.size()<d_hat_2){

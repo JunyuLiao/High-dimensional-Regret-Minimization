@@ -9,22 +9,22 @@ import os
 # Default parameters
 dataset_path = "datasets/e100-10k.txt"
 d_prime_values = [2, 3, 4, 5]  # Values to sweep for d_prime
-d_hat_1_values = [5, 6, 7, 8, 9, 10]  # Values to sweep
-d_hat_2 = 7
+d_hat_1 = 8
+d_hat_2_values = [5, 6, 7, 8, 9, 10]
 K = 30
-num_q = 150
+num_q = 15
 
 def mean(lst):
     return sum(lst) / len(lst) if lst else float('nan')
 
-# Store results for all d_prime and d_hat_1 combinations
+# Store results for all d_prime and d_hat_2 combinations
 all_results = {}
 
-# Iterate over d_prime values first, then d_hat_1 values
+# Iterate over d_prime values first, then d_hat_2 values
 for d_prime in d_prime_values:
     all_results[d_prime] = {}
     
-    for d_hat_1 in d_hat_1_values:
+    for d_hat_2 in d_hat_2_values:
         command = ["./run", dataset_path, str(d_prime), str(d_hat_1), str(d_hat_2), str(K), str(num_q)]
 
         stats = {
@@ -46,14 +46,20 @@ for d_prime in d_prime_values:
         }
 
         # Execution loop with progress bar
-        for _ in tqdm(range(10), desc=f"d_prime = {d_prime}, d_hat_1 = {d_hat_1}"):
-            result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        for _ in tqdm(range(10), desc=f"d_prime = {d_prime}, d_hat_2 = {d_hat_2}"):
+            # add time constraints, kill after 5 minutes
+            try:
+                result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=300)
+            except subprocess.TimeoutExpired:
+                print(f"Command timed out for d_prime={d_prime}, d_hat_2={d_hat_2}")
+                continue
 
             if result.returncode != 0:
                 print(f"Command failed with return code {result.returncode}")
                 continue
 
             output = result.stdout.lower()
+            print(output)  # Debugging output
 
             # Case 1: Attribute Subset Mode
             if "attribute subset" in output:
@@ -100,11 +106,11 @@ for d_prime in d_prime_values:
                     except ValueError:
                         continue
 
-        # Store results for this d_prime and d_hat_1 combination
-        all_results[d_prime][d_hat_1] = stats
+        # Store results for this d_prime and d_hat_2 combination
+        all_results[d_prime][d_hat_2] = stats
 
         # Report for this combination
-        print(f"\n===== Results for d_prime = {d_prime}, d_hat_1 = {d_hat_1} =====")
+        print(f"\n===== Results for d_prime = {d_prime}, d_hat_2 = {d_hat_2} =====")
 
         # Attribute Subset Summary
         asc = stats["attr_subset_count"]
@@ -135,7 +141,7 @@ colors = ['blue', 'red', 'green', 'orange']
 markers = ['o', 's', '^', 'D']
 
 # Create directory for individual plots
-individual_plots_dir = 'plot/individual_figures'
+individual_plots_dir = 'plot/d_hat_2'
 os.makedirs(individual_plots_dir, exist_ok=True)
 
 # Create individual figures for each plot type
@@ -156,7 +162,7 @@ for plot_idx, (plot_name, plot_title, ylabel) in enumerate(plot_types):
         marker = markers[d_prime_idx % len(markers)]
         
         # Prepare data for this d_prime
-        d_hat_1_list = []
+        d_hat_2_list = []
         attr_avg_questions = []
         attr_avg_rounds = []
         attr_sphere_rr = []
@@ -164,10 +170,10 @@ for plot_idx, (plot_name, plot_title, ylabel) in enumerate(plot_types):
         attr_win_rates = []
         interactive_avg_questions = []
 
-        for d_hat_1 in d_hat_1_values:
-            if d_hat_1 in all_results[d_prime]:
-                stats = all_results[d_prime][d_hat_1]
-                d_hat_1_list.append(d_hat_1)
+        for d_hat_2 in d_hat_2_values:
+            if d_hat_2 in all_results[d_prime]:
+                stats = all_results[d_prime][d_hat_2]
+                d_hat_2_list.append(d_hat_2)
                 
                 # Attribute subset metrics
                 if stats["attr_subset_count"] > 0:
@@ -191,33 +197,33 @@ for plot_idx, (plot_name, plot_title, ylabel) in enumerate(plot_types):
 
         # Plot based on type
         if plot_name == 'attr_avg_questions':
-            plt.plot(d_hat_1_list, attr_avg_questions, color=color, marker=marker,
+            plt.plot(d_hat_2_list, attr_avg_questions, color=color, marker=marker,
                     linewidth=2, markersize=8, label=f'd_prime={d_prime}')
         elif plot_name == 'attr_avg_rounds':
-            plt.plot(d_hat_1_list, attr_avg_rounds, color=color, marker=marker,
+            plt.plot(d_hat_2_list, attr_avg_rounds, color=color, marker=marker,
                     linewidth=2, markersize=8, label=f'd_prime={d_prime}')
         elif plot_name == 'regret_ratio':
-            plt.plot(d_hat_1_list, attr_sphere_rr, color=color, marker=marker,
+            plt.plot(d_hat_2_list, attr_sphere_rr, color=color, marker=marker,
                     linewidth=2, markersize=8, linestyle='--', alpha=0.7, 
                     label=f'Sphere (d_prime={d_prime})')
-            plt.plot(d_hat_1_list, attr_attsub_rr, color=color, marker=marker,
+            plt.plot(d_hat_2_list, attr_attsub_rr, color=color, marker=marker,
                     linewidth=2, markersize=8, label=f'Attsub (d_prime={d_prime})')
         elif plot_name == 'attr_win_rate':
-            plt.plot(d_hat_1_list, [wr * 100 for wr in attr_win_rates], color=color, marker=marker,
+            plt.plot(d_hat_2_list, [wr * 100 for wr in attr_win_rates], color=color, marker=marker,
                     linewidth=2, markersize=8, label=f'd_prime={d_prime}')
         elif plot_name == 'interactive_questions':
-            plt.plot(d_hat_1_list, interactive_avg_questions, color=color, marker=marker,
+            plt.plot(d_hat_2_list, interactive_avg_questions, color=color, marker=marker,
                     linewidth=2, markersize=8, label=f'd_prime={d_prime}')
         elif plot_name == 'comparison':
-            plt.plot(d_hat_1_list, attr_avg_questions, color=color, marker=marker,
+            plt.plot(d_hat_2_list, attr_avg_questions, color=color, marker=marker,
                     linewidth=2, markersize=8, linestyle='-', 
                     label=f'Attr Subset (d_prime={d_prime})')
-            plt.plot(d_hat_1_list, interactive_avg_questions, color=color, marker=marker,
+            plt.plot(d_hat_2_list, interactive_avg_questions, color=color, marker=marker,
                     linewidth=2, markersize=8, linestyle=':', 
                     label=f'Interactive (d_prime={d_prime})')
 
     plt.title(plot_title, fontsize=14)
-    plt.xlabel('d_hat_1')
+    plt.xlabel('d_hat_2')
     plt.ylabel(ylabel)
     plt.legend()
     plt.grid(True, alpha=0.3)
@@ -232,14 +238,14 @@ for plot_idx, (plot_name, plot_title, ylabel) in enumerate(plot_types):
 
 # Also create the combined figure
 fig, axes = plt.subplots(2, 3, figsize=(18, 12))
-fig.suptitle('Results vs d_hat_1 Values for Different d_prime', fontsize=16)
+fig.suptitle('Results vs d_hat_2 Values for Different d_prime', fontsize=16)
 
 for d_prime_idx, d_prime in enumerate(d_prime_values):
     color = colors[d_prime_idx % len(colors)]
     marker = markers[d_prime_idx % len(markers)]
     
     # Prepare data for this d_prime
-    d_hat_1_list = []
+    d_hat_2_list = []
     attr_avg_questions = []
     attr_avg_rounds = []
     attr_sphere_rr = []
@@ -247,10 +253,10 @@ for d_prime_idx, d_prime in enumerate(d_prime_values):
     attr_win_rates = []
     interactive_avg_questions = []
 
-    for d_hat_1 in d_hat_1_values:
-        if d_hat_1 in all_results[d_prime]:
-            stats = all_results[d_prime][d_hat_1]
-            d_hat_1_list.append(d_hat_1)
+    for d_hat_2 in d_hat_2_values:
+        if d_hat_2 in all_results[d_prime]:
+            stats = all_results[d_prime][d_hat_2]
+            d_hat_2_list.append(d_hat_2)
             
             # Attribute subset metrics
             if stats["attr_subset_count"] > 0:
@@ -273,79 +279,84 @@ for d_prime_idx, d_prime in enumerate(d_prime_values):
                 interactive_avg_questions.append(np.nan)
 
     # Plot on each subplot
-    axes[0, 0].plot(d_hat_1_list, attr_avg_questions, color=color, marker=marker,
+    axes[0, 0].plot(d_hat_2_list, attr_avg_questions, color=color, marker=marker,
                     linewidth=2, markersize=8, label=f'd_prime={d_prime}')
-    axes[0, 1].plot(d_hat_1_list, attr_avg_rounds, color=color, marker=marker,
+    axes[0, 1].plot(d_hat_2_list, attr_avg_rounds, color=color, marker=marker,
                     linewidth=2, markersize=8, label=f'd_prime={d_prime}')
-    axes[0, 2].plot(d_hat_1_list, attr_sphere_rr, color=color, marker=marker,
+    axes[0, 2].plot(d_hat_2_list, attr_sphere_rr, color=color, marker=marker,
                     linewidth=2, markersize=8, linestyle='--', alpha=0.7,
                     label=f'Sphere (d_prime={d_prime})')
-    axes[0, 2].plot(d_hat_1_list, attr_attsub_rr, color=color, marker=marker,
+    axes[0, 2].plot(d_hat_2_list, attr_attsub_rr, color=color, marker=marker,
                     linewidth=2, markersize=8, label=f'Attsub (d_prime={d_prime})')
-    axes[1, 0].plot(d_hat_1_list, [wr * 100 for wr in attr_win_rates], color=color, marker=marker,
+    axes[1, 0].plot(d_hat_2_list, [wr * 100 for wr in attr_win_rates], color=color, marker=marker,
                     linewidth=2, markersize=8, label=f'd_prime={d_prime}')
-    axes[1, 1].plot(d_hat_1_list, interactive_avg_questions, color=color, marker=marker,
+    axes[1, 1].plot(d_hat_2_list, interactive_avg_questions, color=color, marker=marker,
                     linewidth=2, markersize=8, label=f'd_prime={d_prime}')
-    axes[1, 2].plot(d_hat_1_list, attr_avg_questions, color=color, marker=marker,
+    axes[1, 2].plot(d_hat_2_list, attr_avg_questions, color=color, marker=marker,
                     linewidth=2, markersize=8, linestyle='-',
                     label=f'Attr Subset (d_prime={d_prime})')
-    axes[1, 2].plot(d_hat_1_list, interactive_avg_questions, color=color, marker=marker,
+    axes[1, 2].plot(d_hat_2_list, interactive_avg_questions, color=color, marker=marker,
                     linewidth=2, markersize=8, linestyle=':',
                     label=f'Interactive (d_prime={d_prime})')
 
 # Configure subplots
 axes[0, 0].set_title('Attribute Subset: Avg Questions')
-axes[0, 0].set_xlabel('d_hat_1')
+axes[0, 0].set_xlabel('d_hat_2')
 axes[0, 0].set_ylabel('Average Questions')
 axes[0, 0].legend()
 axes[0, 0].grid(True, alpha=0.3)
 
 axes[0, 1].set_title('Attribute Subset: Avg Rounds')
-axes[0, 1].set_xlabel('d_hat_1')
+axes[0, 1].set_xlabel('d_hat_2')
 axes[0, 1].set_ylabel('Average Rounds')
 axes[0, 1].legend()
 axes[0, 1].grid(True, alpha=0.3)
 
 axes[0, 2].set_title('Regret Ratio Comparison')
-axes[0, 2].set_xlabel('d_hat_1')
+axes[0, 2].set_xlabel('d_hat_2')
 axes[0, 2].set_ylabel('Regret Ratio')
 axes[0, 2].legend()
 axes[0, 2].grid(True, alpha=0.3)
 
 axes[1, 0].set_title('Attsub Win Rate')
-axes[1, 0].set_xlabel('d_hat_1')
+axes[1, 0].set_xlabel('d_hat_2')
 axes[1, 0].set_ylabel('Win Rate (%)')
 axes[1, 0].legend()
 axes[1, 0].grid(True, alpha=0.3)
 
 axes[1, 1].set_title('Interactive: Avg Questions')
-axes[1, 1].set_xlabel('d_hat_1')
+axes[1, 1].set_xlabel('d_hat_2')
 axes[1, 1].set_ylabel('Average Questions')
 axes[1, 1].legend()
 axes[1, 1].grid(True, alpha=0.3)
 
 axes[1, 2].set_title('Questions: Attr Subset vs Interactive')
-axes[1, 2].set_xlabel('d_hat_1')
+axes[1, 2].set_xlabel('d_hat_2')
 axes[1, 2].set_ylabel('Average Questions')
 axes[1, 2].legend()
 axes[1, 2].grid(True, alpha=0.3)
 
 plt.tight_layout()
-plt.savefig('plot/d_prime_d_hat_1_results.png', dpi=300, bbox_inches='tight')
+# plt.savefig('plot/d_prime_d_hat_2_results.png', dpi=300, bbox_inches='tight')
+# save in the folder as well
+filename = 'd_prime_d_hat_2_results.png'
+filepath = os.path.join(individual_plots_dir, filename)
+plt.savefig(filepath, dpi=300, bbox_inches='tight')
+plt.close()
 plt.show()
 
-print("Combined plot saved as 'plot/d_prime_d_hat_1_results.png'")
+print("Combined plot saved as 'plot/d_prime_d_hat_2_results.png'")
 print(f"Individual plots saved in '{individual_plots_dir}/'")
 
 # Print summary tables for each d_prime
 for d_prime in d_prime_values:
     print(f"\n===== Summary Table for d_prime = {d_prime} =====")
-    print("d_hat_1 | Attr Questions | Attr Rounds | Sphere RR  | Attsub RR  | Win Rate | Interactive Q")
+    print("d_hat_2 | Attr Questions | Attr Rounds | Sphere RR  | Attsub RR  | Win Rate | Interactive Q")
     print("--------|----------------|-------------|------------|------------|----------|-------------")
     
-    for d_hat_1 in d_hat_1_values:
-        if d_hat_1 in all_results[d_prime]:
-            stats = all_results[d_prime][d_hat_1]
+    for d_hat_2 in d_hat_2_values:
+        if d_hat_2 in all_results[d_prime]:
+            stats = all_results[d_prime][d_hat_2]
             
             if stats["attr_subset_count"] > 0:
                 attr_q = mean(stats["attr_subset"]["questions"])
@@ -361,4 +372,4 @@ for d_prime in d_prime_values:
             else:
                 inter_q = float('nan')
                 
-            print(f"{d_hat_1:7} | {attr_q:13.2f} | {attr_r:10.2f} | {sphere_rr:9.6f} | {attsub_rr:9.6f} | {win_rate*100:7.1f}% | {inter_q:11.2f}")
+            print(f"{d_hat_2:7} | {attr_q:13.2f} | {attr_r:10.2f} | {sphere_rr:9.6f} | {attsub_rr:9.6f} | {win_rate*100:7.1f}% | {inter_q:11.2f}")
