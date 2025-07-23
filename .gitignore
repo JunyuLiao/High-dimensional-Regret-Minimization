@@ -5,24 +5,32 @@ plot/
 
 # macOS system files
 .DS_Store
+.AppleDouble
+.LSOverride
 
 # Python bytecode
 __pycache__/
 *.py[cod]
+*$py.class
 *.so
 
 # Conda/venv
 env/
 .venv/
 *.env
+venv/
 
 # Logs and temporary files
 *.log
 *.tmp
+*.temp
 
 # VSCode and IDE settings
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
 # Executables and object files
 *.out
@@ -30,8 +38,31 @@ env/
 *.exe
 run
 run_debug
+*.dSYM
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
 
+# Build artifacts
+build/
+dist/
+*.tar.gz
+*.zip
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Ignore .DS_Store files
+.DS_Store
+
+
+# Backup files
+*.bak
+*.backup
+
+# Test files
+test.txt
 run.dSYM/
+run.dSYM.zip

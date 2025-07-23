@@ -19,15 +19,15 @@ TARGET = run
 
 # Build all
 all:
-	$(CXX) $(CXXFLAGS) *.c *.cpp $(LDFLAGS) -Ofast -o $(TARGET)
+	$(CXX) $(CXXFLAGS) *.cpp other/*.c other/*.cpp $(LDFLAGS) -Ofast -o $(TARGET)
 
 # Build with Valgrind
 valgrind:
-	$(CXX) $(CXXFLAGS) *.c *.cpp $(LDFLAGS) -g -O0 -o $(TARGET)
+	$(CXX) $(CXXFLAGS) *.cpp other/*.c other/*.cpp $(LDFLAGS) -g -O0 -o $(TARGET)
 
 # Build with GDB
 gdb:
-	$(CXX) -g $(CXXFLAGS) *.c *.cpp $(LDFLAGS) -o $(TARGET)
+	$(CXX) -g $(CXXFLAGS) *.cpp other/*.c other/*.cpp $(LDFLAGS) -o $(TARGET)
 
 # Clean up
 clean:

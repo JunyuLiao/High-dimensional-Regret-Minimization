@@ -1,10 +1,10 @@
-#include "data_utility.h"
+#include "other/data_utility.h"
 
-#include "operation.h"
-#include "sphere.h"
-#include "GeoGreedy.h"
-#include "DMM.h"
-#include "lp.h"
+#include "other/operation.h"
+#include "other/sphere.h"
+#include "other/GeoGreedy.h"
+#include "other/DMM.h"
+#include "other/lp.h"
 #include "highdim.h"
 
 

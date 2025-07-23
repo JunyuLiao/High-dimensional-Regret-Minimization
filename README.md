@@ -15,13 +15,22 @@ This repository implements an **interactive k-regret minimization** algorithm ta
 ## Repository Structure
 
 ```
-├── datasets/            # Example datasets
-├── script.py            # script for standard experimental results
-├── highdim.cpp          # Core algorithm implementation
-├── attribute_subset.cpp # our proposed attribute subset method
-├── sphere.cpp           # the code for the applied k-regret minimization algorithm
-├── interactive.py       # the applied interactive algorithm
-└── README.md            # This documentation file
+├── datasets/              # Example datasets
+├── other/                 # Helper code files
+│   ├── data_struct.h      # Data structures
+│   ├── data_utility.cpp   # Utility functions
+│   ├── sphere.cpp         # Sphere algorithm 
+│   ├── operation.cpp      # Core operations
+│   ├── lp.cpp            # Linear programming 
+│   └── ...               # Other helper files
+├── main.cpp              # Main entry point
+├── highdim.cpp           # Core high-dimensional 
+├── highdim.h             # High-dimensional 
+├── attribute_subset.cpp  # Attribute subset 
+├── attribute_subset.h    # Attribute subset 
+├── script.py             # Main experimental 
+├── Makefile              # Build configuration
+└── README.md             # This documentation
 ```
 
 ## Installation

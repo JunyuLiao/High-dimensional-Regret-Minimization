@@ -1,9 +1,9 @@
-#include "data_utility.h"
-#include "operation.h"
-#include "sphere.h"
-#include "GeoGreedy.h"
-#include "DMM.h"
-#include "lp.h"
+#include "other/data_utility.h"
+#include "other/operation.h"
+#include "other/sphere.h"
+#include "other/GeoGreedy.h"
+#include "other/DMM.h"
+#include "other/lp.h"
 #include <iostream>
 #include "stdlib.h"
 #include "stdio.h"
@@ -14,11 +14,11 @@
 #include <set>
 #include <vector>
 #include <algorithm>
-#include "data_struct.h"
-#include "read_write.h"
-#include "maxUtility.h"
+#include "other/data_struct.h"
+#include "other/read_write.h"
+#include "other/maxUtility.h"
 #include "attribute_subset.h"
-#include "medianhull.h"
+#include "other/medianhull.h"
 #include <ctime>
 using namespace std;
 
