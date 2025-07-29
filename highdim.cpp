@@ -305,7 +305,7 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
 	point_set_t* S_output = nullptr;
 
 	int final_d = set_final_dimensions.size();
-    printf("number of final dimensions: %d\n", final_d);
+    // printf("number of final dimensions: %d\n", final_d);
 	point_set_t* D_prime = alloc_point_set(n);
 	for (int j=0;j<n;++j){
 		D_prime->points[j] = alloc_point(final_d);
@@ -317,8 +317,7 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
     // take the skyline of the newly constructed dataset D_prime
     point_set_t* skyline_D_prime = skyline_point(D_prime);
 
-    //print the number of points in skyline_D
-    printf("number of points in skyline_D: %d\n", skyline_D_prime->numberOfPoints);
+    // printf("number of points in skyline_D: %d\n", skyline_D_prime->numberOfPoints);
     // construct the final u
     point_t* u_final = alloc_point(final_d);
     for (int j = 0; j < final_d; ++j) {
@@ -329,9 +328,9 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
     auto start_time_3 = std::chrono::high_resolution_clock::now();
 	if (num_questions > 0){
 		// apply the interactive code to select the optimal tuple
-        printf("Applying the interactive algorithm to select the optimal tuple\n");
+        // printf("Applying the interactive algorithm to select the optimal tuple\n");
         S_output = alloc_point_set(1);
-        if (skyline_D_prime->points[0]->dim == final_d) printf("dimension: %d\n", final_d);
+        // if (skyline_D_prime->points[0]->dim == final_d) printf("dimension: %d\n", final_d);
         point_t* opt_p = max_utility(skyline_D_prime, u_final, s, epsilon, num_questions, Qcount, Csize, cmp_option, stop_option, prune_option, dom_option);
         S_output->points[0] = skyline->points[opt_p->id];
         num_questions -= Qcount;
@@ -342,9 +341,9 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
             printf("error: final_d >= K\n");
             exit(1);
         }
-        printf("Applying the attribute subset method to output a regret minimizing subset\n");
+        // printf("Applying the attribute subset method to output a regret minimizing subset\n");
         if (final_d <= d_hat_2){
-            point_set_t* S = sphereWSImpLP(skyline_D_prime, d_hat_2);
+            point_set_t* S = sphereWSImpLP(skyline_D_prime, K);
             S_output = alloc_point_set(S->numberOfPoints);
             for (int j = 0; j < S->numberOfPoints; ++j){
                 S_output->points[j] = skyline->points[S->points[j]->id];

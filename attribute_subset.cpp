@@ -19,7 +19,7 @@ point_set_t* attribute_subset(point_set_t* skyline, point_set_t* S_output, int f
         num_rounds++;
         if (num_rounds > 30){
             // exit if the number of rounds exceeds 30
-            printf("rounds exceeded 30, exiting...\n");
+            // printf("rounds exceeded 30, exiting...\n");
             break;
         }
         //randomly select d_hat dimensions
@@ -87,6 +87,29 @@ point_set_t* attribute_subset(point_set_t* skyline, point_set_t* S_output, int f
         S_output = temp;
     }
     // print the number of rounds
-    printf("Number of rounds in attribute subset method: %d\n", num_rounds);
+    // printf("Number of rounds in attribute subset method: %d\n", num_rounds);
+    if (S_output->numberOfPoints < K){
+        std::set<int> point_ids;
+        for (int i = 0; i < S_output->numberOfPoints; ++i){
+            point_ids.insert(S_output->points[i]->id);
+        }
+        while (point_ids.size() < K){
+            // randomly select a point from S_output
+            std::uniform_int_distribution<int> distribution(0, skyline->numberOfPoints-1);
+            int index = distribution(generator);
+            while (point_ids.find(skyline->points[index]->id) != point_ids.end()){
+                index = distribution(generator);
+            }
+            int point_id = skyline->points[index]->id;
+            // add the id to point_ids
+            point_ids.insert(point_id);
+        }
+        release_point_set(S_output, false);
+        // construct the new S_output
+        S_output = alloc_point_set(K);
+        for (int i = 0; i < K; ++i){
+            S_output->points[i] = skyline->points[*next(point_ids.begin(), i)];
+        }
+    }
     return S_output;
 }

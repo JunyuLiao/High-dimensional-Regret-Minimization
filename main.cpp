@@ -94,53 +94,54 @@ int main(int argc, char *argv[]){
 	double time_12 = h->time_12;
 	double time_3 = h->time_3;
 	
-	printf("number of questions asked: %d\n", num_quest_init-num_questions); // 555
 	point_set_t* S = h->S;
 	std::set<int> final_dimensions = h->final_dimensions;
 
 	// evaluation
+	// for comparison, evaluate the performance of Sphere. the return size is either
+	// (# questions asked in interactive algorithm) * s (Phase 3B) or K (Phase 3A)
+	int K_sphere;
 	if (S->numberOfPoints == 1){
-		printf("time: %f\n", time_12+time_3);
-		for (int i = 0; i < 47; ++i) printf("-"); printf("\n");
-		printf("|%15s |%15s |%10s |\n", "Method", "# of Questions", "Point #ID");
-		for (int i = 0; i < 47; ++i) printf("-"); printf("\n");
-		printf("|%15s |%15s |%10d |\n", "Ground Truth", "-", skyline->points[maxIdx]->id);
-		for (int i = 0; i < 47; ++i) printf("-"); printf("\n");
-		printf("|%15s |%15.0lf |%10d |\n", "UH-Random", Qcount, S->points[0]->id);
+		printf("Phase 3A: \n");
+		K_sphere =  Qcount * s;
 	}
 	else{
-		// for comparison, test the mrr returned by the Sphere algorithm
-		// construct the dataset with the final dimensions
-		point_set_t* D_test = alloc_point_set(n);
-		for (int i = 0; i < n; i++) {
-			D_test->points[i] = alloc_point(final_dimensions.size());
-			D_test->points[i]->id = skyline->points[i]->id;
-			int j = 0;
-			for (auto dim : final_dimensions) {
-				D_test->points[i]->coord[j++] = skyline->points[i]->coord[dim];
-			}
-		}
-		// record the time in seconds
-		auto start_time_sphere = std::chrono::high_resolution_clock::now();
-		point_set_t* skyline_D_test = skyline_point(D_test);
-		point_set_t* S_test = sphereWSImpLP(skyline_D_test, K);
-		auto end_time_sphere = std::chrono::high_resolution_clock::now();
-		std::chrono::duration<double> duration_sphere = end_time_sphere - start_time_sphere;
-		double time_sphere = duration_sphere.count();
-		// printf("Time taken: %.6f seconds\n", duration_sphere.count());
-
-
-		// revert S_test to the original dimensions
-		for (int i = 0; i < S_test->numberOfPoints; i++){
-			S_test->points[i] = skyline->points[S_test->points[i]->id];
-		}
-		double mrr_test = evaluateLP(skyline, S_test, 0, u);
-		for (int i = 0; i < 68; ++i) printf("-"); printf("\n");
-		printf("output size of Sphere: %d | RR of Sphere: %f | Time: %f\n", S_test->numberOfPoints, mrr_test, time_12+time_sphere);
-		double mrr = evaluateLP(skyline, S, 0, u);
-		for (int i = 0; i < 68; ++i) printf("-"); printf("\n");
-		printf("output size of Attsub: %d | RR of Attsub: %f | Time: %f\n", S->numberOfPoints, mrr, time_12+time_3);
+		printf("Phase 3B: \n");
+		K_sphere = K;
 	}
+	// for comparison, test the mrr returned by the Sphere algorithm
+	// construct the dataset with the final dimensions
+	point_set_t* D_test = alloc_point_set(n);
+	for (int i = 0; i < n; i++) {
+		D_test->points[i] = alloc_point(final_dimensions.size());
+		D_test->points[i]->id = skyline->points[i]->id;
+		int j = 0;
+		for (auto dim : final_dimensions) {
+			D_test->points[i]->coord[j++] = skyline->points[i]->coord[dim];
+		}
+	}
+	// record the time in seconds
+	auto start_time_sphere = std::chrono::high_resolution_clock::now();
+	point_set_t* skyline_D_test = skyline_point(D_test);
+	point_set_t* S_test = sphereWSImpLP(skyline_D_test, K_sphere);
+	auto end_time_sphere = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> duration_sphere = end_time_sphere - start_time_sphere;
+	double time_sphere = duration_sphere.count();
+
+	// revert S_test to the original dimensions
+	for (int i = 0; i < S_test->numberOfPoints; i++){
+		S_test->points[i] = skyline->points[S_test->points[i]->id];
+	}
+	double mrr_test = evaluateLP(skyline, S_test, 0, u);
+	for (int i = 0; i < 40; ++i) printf("-"); printf("\n");
+	printf("|%7s |%13s |%5s | %5s |\n", "Method", "Regret Ratio", "Time", "Size");
+	for (int i = 0; i < 40; ++i) printf("-"); printf("\n");
+	printf("|%7s |%13.6lf |%5.2lf | %5d |\n", "Sphere", mrr_test, time_12+time_sphere, S_test->numberOfPoints);
+	for (int i = 0; i < 40; ++i) printf("-"); printf("\n");
+	double mrr = evaluateLP(skyline, S, 0, u);
+	printf("|%7s |%13.6lf |%5.2lf | %5d |\n", "OurAlg", mrr, time_12+time_3, S->numberOfPoints);
+	for (int i = 0; i < 40; ++i) printf("-"); printf("\n");
+	printf("number of questions: %d\n", num_quest_init-num_questions); // 555
 
 	release_point_set(skyline, false);
 	release_point(u);
