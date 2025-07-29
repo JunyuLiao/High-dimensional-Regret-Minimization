@@ -29,7 +29,7 @@ using namespace std;
 
 //interactive version
 int main(int argc, char *argv[]){
-	if (argc != 7) return 0;
+	if (argc != 8) return 0;
 	char* input = argv[1];
 	point_set_t* P = read_points(input);
 	int n = P->numberOfPoints;
@@ -49,7 +49,7 @@ int main(int argc, char *argv[]){
 	// below are default parameters from the interactive paper
 	//-------------------------------------
 	int s = 3; //question size in interactive algorithm (3 as default)
-	double epsilon = 0;
+	double epsilon = atof(argv[7]);
 	int maxRound = 1000;
 	double Qcount, Csize;
 	int prune_option = RTREE;
@@ -96,10 +96,11 @@ int main(int argc, char *argv[]){
 		}
 	}
 
-
 	highdim_output* h = interactive_highdim(skyline, size, d_bar, d_hat, d_hat_2, u, K, s, epsilon, maxRound, Qcount, Csize, cmp_option, stop_option, prune_option, dom_option, num_questions);
+	double time_12 = h->time_12;
+	double time_3 = h->time_3;
+	
 	printf("number of questions asked: %d\n", num_quest_init-num_questions); // 555
-
 	point_set_t* S = h->S;
 	std::set<int> final_dimensions = h->final_dimensions;
 
@@ -125,18 +126,27 @@ int main(int argc, char *argv[]){
 				D_test->points[i]->coord[j++] = skyline->points[i]->coord[dim];
 			}
 		}
+		// record the time in seconds
+		auto start_time_sphere = std::chrono::high_resolution_clock::now();
 		point_set_t* skyline_D_test = skyline_point(D_test);
 		point_set_t* S_test = sphereWSImpLP(skyline_D_test, K);
+		auto end_time_sphere = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<double> duration_sphere = end_time_sphere - start_time_sphere;
+		double time_sphere = duration_sphere.count();
+		// printf("Time taken: %.6f seconds\n", duration_sphere.count());
+
 
 		// revert S_test to the original dimensions
 		for (int i = 0; i < S_test->numberOfPoints; i++){
 			S_test->points[i] = skyline->points[S_test->points[i]->id];
 		}
 		double mrr_test = evaluateLP(skyline, S_test, 0, u);
-		printf("output size of Sphere: %d | RR of Sphere: %f\n", S_test->numberOfPoints, mrr_test);
-		printf("-----------------------------------------------\n");
+		printf("dimension reduction time: %f\n", time_12);
+		for (int i = 0; i < 75; ++i) printf("-"); printf("\n");
+		printf("output size of Sphere: %d | RR of Sphere: %f | Time: %f\n", S_test->numberOfPoints, mrr_test, time_sphere);
 		double mrr = evaluateLP(skyline, S, 0, u);
-		printf("output size of Attsub: %d | RR of Attsub: %f\n", S->numberOfPoints, mrr);
+		for (int i = 0; i < 75; ++i) printf("-"); printf("\n");
+		printf("output size of Attsub: %d | RR of Attsub: %f | Time: %f\n", S->numberOfPoints, mrr, time_3);
 	}
 
 	release_point_set(skyline, false);

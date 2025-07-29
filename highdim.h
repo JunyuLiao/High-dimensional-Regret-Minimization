@@ -26,6 +26,8 @@ using namespace std;
 struct highdim_output{
     point_set_t* S;
     std::set<int> final_dimensions;
+    double time_12;
+    double time_3;
 };
 
 // the complete interactive high-dimensional regret algorithm with attribute subset method

@@ -4,6 +4,9 @@
 highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, int d_hat, int d_hat_2, point_t* u, int K, int s, double epsilon, int maxRound, double& Qcount, double& Csize, int cmp_option, int stop_option, int prune_option, int dom_option, int& num_questions){
     int n = skyline->numberOfPoints;
     int d = skyline->points[0]->dim;
+    // record the time for phase 1 and 2
+    double time_12 = 0.0;
+    auto start_time_12 = std::chrono::high_resolution_clock::now();
     // phase 1: narrow down the dimensions
     // printf("Phase 1\n"); // 111
 	// store the dimensions if the user is interested in at least one in the set
@@ -283,6 +286,9 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
 			}
 		}
 	}
+    auto end_time_12 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration_12 = end_time_12 - start_time_12;
+    time_12 = duration_12.count();
 	// phase 3: find the optimal tuple or the optimal subset
     // printf("Phase 3\n"); // 444
 	// take the union of the final_dimensions and the selected_dimensions
@@ -318,13 +324,17 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
     for (int j = 0; j < final_d; ++j) {
         u_final->coord[j] = u->coord[*next(set_final_dimensions.begin(), j)];
     }
+
+    double time_3 = 0.0;
+    auto start_time_3 = std::chrono::high_resolution_clock::now();
 	if (num_questions > 0){
 		// apply the interactive code to select the optimal tuple
         printf("Applying the interactive algorithm to select the optimal tuple\n");
         S_output = alloc_point_set(1);
         if (skyline_D_prime->points[0]->dim == final_d) printf("dimension: %d\n", final_d);
-        point_t* opt_p = max_utility(skyline_D_prime, u_final, s, epsilon, maxRound, Qcount, Csize, cmp_option, stop_option, prune_option, dom_option);
+        point_t* opt_p = max_utility(skyline_D_prime, u_final, s, epsilon, num_questions, Qcount, Csize, cmp_option, stop_option, prune_option, dom_option);
         S_output->points[0] = skyline->points[opt_p->id];
+        num_questions -= Qcount;
     }
 	else {
         if (final_d >= K){
@@ -344,11 +354,16 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
             S_output = attribute_subset(skyline, S_output, final_d, d_hat_2, K, set_final_dimensions);
         }
 	}
+
+    auto end_time_3 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration_3 = end_time_3 - start_time_3;
+    time_3 = duration_3.count();
     //also return the information about the dimensions chosen, as stored in set_final_dimensions
     highdim_output* output = new highdim_output;
     output->S = S_output;
     output->final_dimensions = set_final_dimensions;
-
+    output->time_12 = time_12;
+    output->time_3 = time_3;
     // release the memory
     release_point_set(skyline_D_prime, false);
     release_point_set(D_prime, true);
