@@ -2,6 +2,15 @@
 datasets/
 output/
 plot/
+result/
+plot_old/
+
+# ignore scripts
+script_inter.py
+script.py
+data_collector.py
+gnuplot_generator.py
+run_pipeline.py
 
 # macOS system files
 .DS_Store
@@ -63,6 +72,7 @@ Desktop.ini
 *.backup
 
 # Test files
-test.txt
 run.dSYM/
 run.dSYM.ziprun
+
+# 

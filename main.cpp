@@ -34,7 +34,7 @@ int main(int argc, char *argv[]){
 	point_set_t* P = read_points(input);
 	int n = P->numberOfPoints;
 	linear_normalize(P);
-	reduce_to_unit(P);
+	// reduce_to_unit(P);
 	int d = P->points[0]->dim;
 	point_set_t* skyline = skyline_point(P);
 	int size = 2; // question size
