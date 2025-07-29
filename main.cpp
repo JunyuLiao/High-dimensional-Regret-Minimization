@@ -8,12 +8,6 @@
 #include "highdim.h"
 
 
-// #ifndef WIN32
-// #include <sys/time.h>
-// #else
-// #include <ctime>
-// #endif
-
 #include <iostream>
 using namespace std;
 #include "stdlib.h"
@@ -105,16 +99,16 @@ int main(int argc, char *argv[]){
 	std::set<int> final_dimensions = h->final_dimensions;
 
 	// evaluation
-	// printf("-----------------------------------------------\n"); // 777
 	if (S->numberOfPoints == 1){
+		printf("time: %f\n", time_12+time_3);
+		for (int i = 0; i < 47; ++i) printf("-"); printf("\n");
 		printf("|%15s |%15s |%10s |\n", "Method", "# of Questions", "Point #ID");
-		printf("-----------------------------------------------\n");
+		for (int i = 0; i < 47; ++i) printf("-"); printf("\n");
 		printf("|%15s |%15s |%10d |\n", "Ground Truth", "-", skyline->points[maxIdx]->id);
-		printf("-----------------------------------------------\n");
+		for (int i = 0; i < 47; ++i) printf("-"); printf("\n");
 		printf("|%15s |%15.0lf |%10d |\n", "UH-Random", Qcount, S->points[0]->id);
 	}
 	else{
-
 		// for comparison, test the mrr returned by the Sphere algorithm
 		// construct the dataset with the final dimensions
 		point_set_t* D_test = alloc_point_set(n);
@@ -141,12 +135,11 @@ int main(int argc, char *argv[]){
 			S_test->points[i] = skyline->points[S_test->points[i]->id];
 		}
 		double mrr_test = evaluateLP(skyline, S_test, 0, u);
-		printf("dimension reduction time: %f\n", time_12);
-		for (int i = 0; i < 75; ++i) printf("-"); printf("\n");
-		printf("output size of Sphere: %d | RR of Sphere: %f | Time: %f\n", S_test->numberOfPoints, mrr_test, time_sphere);
+		for (int i = 0; i < 68; ++i) printf("-"); printf("\n");
+		printf("output size of Sphere: %d | RR of Sphere: %f | Time: %f\n", S_test->numberOfPoints, mrr_test, time_12+time_sphere);
 		double mrr = evaluateLP(skyline, S, 0, u);
-		for (int i = 0; i < 75; ++i) printf("-"); printf("\n");
-		printf("output size of Attsub: %d | RR of Attsub: %f | Time: %f\n", S->numberOfPoints, mrr, time_3);
+		for (int i = 0; i < 68; ++i) printf("-"); printf("\n");
+		printf("output size of Attsub: %d | RR of Attsub: %f | Time: %f\n", S->numberOfPoints, mrr, time_12+time_3);
 	}
 
 	release_point_set(skyline, false);
