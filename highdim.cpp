@@ -305,7 +305,7 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
 	point_set_t* S_output = nullptr;
 
 	int final_d = set_final_dimensions.size();
-    // printf("number of final dimensions: %d\n", final_d);
+    printf("number of final dimensions: %d\n", final_d);
 	point_set_t* D_prime = alloc_point_set(n);
 	for (int j=0;j<n;++j){
 		D_prime->points[j] = alloc_point(final_d);

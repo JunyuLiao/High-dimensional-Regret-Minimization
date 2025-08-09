@@ -136,10 +136,10 @@ int main(int argc, char *argv[]){
 	for (int i = 0; i < 40; ++i) printf("-"); printf("\n");
 	printf("|%7s |%13s |%5s | %5s |\n", "Method", "Regret Ratio", "Time", "Size");
 	for (int i = 0; i < 40; ++i) printf("-"); printf("\n");
-	printf("|%7s |%13.6lf |%5.2lf | %5d |\n", "Sphere", mrr_test, time_12+time_sphere, S_test->numberOfPoints);
+	printf("|%7s |%13.3lf |%5.2lf | %5d |\n", "Sphere", mrr_test, time_12+time_sphere, S_test->numberOfPoints);
 	for (int i = 0; i < 40; ++i) printf("-"); printf("\n");
 	double mrr = evaluateLP(skyline, S, 0, u);
-	printf("|%7s |%13.6lf |%5.2lf | %5d |\n", "OurAlg", mrr, time_12+time_3, S->numberOfPoints);
+	printf("|%7s |%13.3lf |%5.2lf | %5d |\n", "OurAlg", mrr, time_12+time_3, S->numberOfPoints);
 	for (int i = 0; i < 40; ++i) printf("-"); printf("\n");
 	printf("number of questions: %d\n", num_quest_init-num_questions); // 555
 

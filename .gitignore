@@ -4,6 +4,7 @@ output/
 plot/
 result/
 plot_old/
+experiment/
 
 # ignore scripts
 script_inter.py
