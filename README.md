@@ -50,4 +50,4 @@ To run the algorithm in the paper 'High-dimensional Regret Minimization', use
 
 For example, "./run datasets/e100-10k.txt 3 7 6 1 35" will run the algorithm on synthetic dataset of n=10k, d=100, with 35 questions allowed and output size 1. The output also contains results from _Sphere-Adapt_ (as introduced in our paper) for comparison, if it can be executed normally.
 
-Note that due to the size limit of Github, the standard dataset used in our experiments (synthetic with n=100k, d=100) is not provided. 
+Note that due to the size limit of Github, the standard synthetic dataset used in our experiments (n=100k, d=100) is not provided. 
