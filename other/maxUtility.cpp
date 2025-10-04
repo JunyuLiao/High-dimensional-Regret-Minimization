@@ -352,3 +352,142 @@ point_t* max_utility(point_set_t* P, point_t* u, int s,  double epsilon, int max
 
 	return result;
 }
+
+// construct extreme vectors from question mappings
+void construct_ext_vec_from_questions(point_set_t* P, const question_mapping& qm, point_t* u, vector<point_t*>& ext_vec, int full_dim, const std::map<int, int>& dim_mapping, point_set_t* D_prime)
+{
+    for (const auto& question : qm.questions) {
+        const std::set<int>& original_dimensions = question.first;
+        const std::vector<int>& tuple_indices = question.second;
+        
+        // Check if the set contains more than one key dimension (non-zero weight in u)
+        int key_dim_count = 0;
+        for (int original_dim : original_dimensions) {
+            // Map to reduced dimension and check if it's a key dimension
+            if (dim_mapping.find(original_dim) != dim_mapping.end()) {
+                int reduced_dim = dim_mapping.at(original_dim);
+                if (reduced_dim < full_dim && u->coord[reduced_dim] > 0) {
+                    key_dim_count++;
+                }
+            }
+        }
+        
+        if (key_dim_count > 1 && tuple_indices.size() > 1) {
+            // Get the selected point (first in the vector) - map from original to reduced index
+            int original_selected_idx = tuple_indices[0];
+            if (D_prime->points[original_selected_idx] == NULL) {
+                continue; // Skip if the point is not in the reduced dataset
+            }
+            int selected_idx = original_selected_idx;
+            point_t* p = P->points[selected_idx];
+            
+            // For each non-selected point, create an extreme vector
+            for (size_t i = 1; i < tuple_indices.size(); i++) {
+                int original_q_idx = tuple_indices[i];
+                if (D_prime->points[original_q_idx] == NULL) {
+                    continue; // Skip if the point is not in the reduced dataset
+                }
+                int q_idx = original_q_idx;
+                point_t* q = P->points[q_idx];
+                
+                // Create the difference vector p - q
+                point_t* diff = alloc_point(full_dim);
+                for (int j = 0; j < full_dim; j++) {
+                    diff->coord[j] = 0; // Initialize to 0
+                }
+                
+                // Fill in the dimensions that were shown in the question
+                for (int original_dim : original_dimensions) {
+                    if (dim_mapping.find(original_dim) != dim_mapping.end()) {
+                        int reduced_dim = dim_mapping.at(original_dim);
+                        if (reduced_dim < full_dim) {
+                            diff->coord[reduced_dim] = q->coord[reduced_dim] - p->coord[reduced_dim];
+                        }
+                    }
+                }
+                
+                // Normalize the vector
+                double len = calc_len(diff);
+                if (len > 0) {
+                    point_t* new_ext_vec = scale(1.0 / len, diff);
+                    ext_vec.push_back(new_ext_vec);
+                }
+                
+                release_point(diff);
+            }
+        }
+    }
+}
+
+// the main interactive algorithm with pre-recorded questions
+point_t* max_utility_with_questions(point_set_t* P, point_t* u, int s, double epsilon, int maxRound, double &Qcount, double &Csize, int cmp_option, int stop_option, int prune_option, int dom_option, const question_mapping& qm, const std::map<int, int>& dim_mapping, point_set_t* D_prime)
+{
+    int dim = P->points[0]->dim;
+
+    // the indexes of the candidate set
+    // initially, it is all the skyline cars
+    vector<int> C_idx;
+    for(int i = 0; i < P->numberOfPoints; i++)
+        C_idx.push_back(i);
+
+    double time;
+
+    // the initial exteme vector sets V = {−ei | i ∈ [1, d], ei [i] = 1 and ei [j] = 0 if i , j}.
+    vector<point_t*> ext_vec;
+    for (int i = 0; i < dim; i++)
+    {
+        point_t* e = alloc_point(dim);
+        for (int j = 0; j < dim; j++)
+        {
+            if (i == j)
+                e->coord[j] = -1;
+            else
+                e->coord[j] = 0;
+        }
+        ext_vec.push_back(e);
+    }
+
+    // Construct extreme vectors from pre-recorded questions using dimension mapping
+    construct_ext_vec_from_questions(D_prime, qm, u, ext_vec, dim, dim_mapping, D_prime);
+
+    int current_best_idx = -1;
+    int last_best = -1;
+    vector<int> frame;
+
+    // get the index of the "current best" point
+    current_best_idx = get_current_best_pt(P, C_idx, ext_vec);
+    
+    // Qcount - the number of querstions asked
+    // Csize - the size of the current candidate set
+
+    Qcount = 0;
+    double rr = 1;
+
+    // interactively reduce the candidate set and shrink the candidate utility range
+    while (C_idx.size()> 1 && (rr > epsilon  && !isZero(rr - epsilon)) && Qcount <  maxRound)  // while none of the stopping conditiong is true
+    {
+        Qcount++;
+        sort(C_idx.begin(), C_idx.end()); // prevent select two different points after different skyline algorithms
+        
+        // generate the options for user selection and update the extreme vecotrs based on the user feedback
+        update_ext_vec(P, C_idx, u, s, ext_vec, current_best_idx, last_best, frame, cmp_option);
+
+        if(C_idx.size()==1 ) // || global_best_idx == current_best_idx
+            break;
+
+        //update candidate set
+        if(prune_option == SQL)
+            sql_pruning(P, C_idx, ext_vec, rr, stop_option, dom_option);
+        else
+            rtree_pruning(P, C_idx, ext_vec, rr, stop_option, dom_option);
+    }
+
+    // get the final result 
+    point_t* result = P->points[get_current_best_pt(P, C_idx, ext_vec)];
+    Csize = C_idx.size();
+
+    for (int i = 0; i < ext_vec.size(); i++)
+        release_point(ext_vec[i]);
+
+    return result;
+}

@@ -2,11 +2,16 @@
 
 
 highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, int d_hat, int d_hat_2, point_t* u, int K, int s, double epsilon, int maxRound, double& Qcount, double& Csize, int cmp_option, int stop_option, int prune_option, int dom_option, int& num_questions){
+
     int n = skyline->numberOfPoints;
     int d = skyline->points[0]->dim;
     // record the time for phase 1 and 2
     double time_12 = 0.0;
     auto start_time_12 = std::chrono::high_resolution_clock::now();
+    
+    // Initialize question mapping to record all questions asked
+    question_mapping qm;
+    
     // phase 1: narrow down the dimensions
     // printf("Phase 1\n"); // 111
 	// store the dimensions if the user is interested in at least one in the set
@@ -57,10 +62,32 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
         }
         int id = maxValue > 0 ? S->points[maxIdx]->id : -1;
         num_questions -= 1;
+        
+        // Record the question: dimensions shown and tuple indices (selected first)
+        std::set<int> question_dims;
+        for (int j = 0; j < d_hat; ++j) {
+            question_dims.insert(i*d_hat + j);
+        }
+        std::vector<int> tuple_indices;
+        if (id != -1) {
+            // Add selected point first, then others
+            tuple_indices.push_back(id);
+            for (int j = 0; j < S->numberOfPoints; ++j) {
+                if (S->points[j]->id != id) {
+                    tuple_indices.push_back(S->points[j]->id);
+                }
+            }
+        }
+        qm.questions[question_dims] = tuple_indices;
+        
         release_point(u_hat);
         
 		if (id==-1){
-			for (int j=0;j<d_hat;++j) selected_dimensions.erase(i*d_hat+j);
+			// for (int j=0;j<d_hat;++j) selected_dimensions.erase(i*d_hat+j);
+            for (int j=0;j<d_hat;++j){
+                int dim_to_remove = i*d_hat+j;
+                selected_dimensions.erase(dim_to_remove);
+            }
 		}
 		release_point_set(S, false);
         release_point_set(D, true);
@@ -91,14 +118,15 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
                     printf("error_2: selected_dimensions is empty\n");
                     exit(1);
                 }
-                bool answer = u->coord[*selected_dimensions.begin()] > 0;
+                int current_dim = *selected_dimensions.begin();
+                bool answer = u->coord[current_dim] > 0;
                 num_questions -= 1;
 				if (!answer){
 					selected_dimensions.erase(selected_dimensions.begin());
                     d_left -= 1;
 				}
 				else {
-					final_dimensions.insert(*selected_dimensions.begin());
+					final_dimensions.insert(current_dim);
 					selected_dimensions.erase(selected_dimensions.begin());
                     d_left -= 1;
                     d_target -= 1;
@@ -165,12 +193,31 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
                 }
                 id = maxValue > 0 ? S->points[maxIdx]->id : -1;
                 num_questions -= 1;
+                
+                // Record the question: dimensions shown and tuple indices (selected first)
+                std::set<int> question_dims;
+                for (int j = 0; j < group_size; ++j) {
+                    question_dims.insert(*next(selected_dimensions.begin(), j));
+                }
+                std::vector<int> tuple_indices;
+                if (id != -1) {
+                    // Add selected point first, then others
+                    tuple_indices.push_back(id);
+                    for (int j = 0; j < S->numberOfPoints; ++j) {
+                        if (S->points[j]->id != id) {
+                            tuple_indices.push_back(S->points[j]->id);
+                        }
+                    }
+                }
+                qm.questions[question_dims] = tuple_indices;
+                
                 release_point(u_hat);
                 release_point_set(S, false);
                 release_point_set(D, true);
             }
 			if (id == -1){
 				for (int j=0;j<group_size;++j){
+					int dim_to_remove = *selected_dimensions.begin();
 					selected_dimensions.erase(selected_dimensions.begin());
 				}
 				d_left -= group_size;
@@ -210,7 +257,8 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
                                     d_left -= 1;
                                     d_target -= 1;
                                 }
-                                if (u->coord[*next(selected_dimensions.begin(), right)] > 0){
+                                // if (u->coord[*next(selected_dimensions.begin(), right)] > 0){
+                                else{
                                     num_questions -= 1;
                                     // the dimension is in the right half
                                     final_dimensions.insert(*next(selected_dimensions.begin(), right));
@@ -259,6 +307,24 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
                         }
                         int id = maxValue > 0 ? S->points[maxIdx]->id : -1;
                         num_questions -= 1;
+                        
+                        // Record the question: dimensions shown and tuple indices (selected first)
+                        std::set<int> question_dims;
+                        for (int j = 0; j < mid-left+1; ++j) {
+                            question_dims.insert(*next(selected_dimensions.begin(), left+j));
+                        }
+                        std::vector<int> tuple_indices;
+                        if (id != -1) {
+                            // Add selected point first, then others
+                            tuple_indices.push_back(id);
+                            for (int j = 0; j < S->numberOfPoints; ++j) {
+                                if (S->points[j]->id != id) {
+                                    tuple_indices.push_back(S->points[j]->id);
+                                }
+                            }
+                        }
+                        qm.questions[question_dims] = tuple_indices;
+                        
                         release_point_set(S, false);
                         release_point_set(D, true);
                         release_point(u_hat);
@@ -266,6 +332,7 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
                         if (id == -1){
                             // the dimension is in the right half, remove all dimensions in the left half
                             for (int j=0; j < mid-left+1; ++j){
+                                int dim_to_remove = *next(selected_dimensions.begin(), left);
                                 selected_dimensions.erase(next(selected_dimensions.begin(), left));
                                 d_left -= 1;
                             }
@@ -314,8 +381,10 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
 			D_prime->points[j]->coord[p] = skyline->points[j]->coord[*next(set_final_dimensions.begin(), p)];
 		}
 	}
+
     // take the skyline of the newly constructed dataset D_prime
     point_set_t* skyline_D_prime = skyline_point(D_prime);
+
 
     // printf("number of points in skyline_D: %d\n", skyline_D_prime->numberOfPoints);
     // construct the final u
@@ -331,22 +400,56 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
         // printf("Applying the interactive algorithm to select the optimal tuple\n");
         S_output = alloc_point_set(1);
         // if (skyline_D_prime->points[0]->dim == final_d) printf("dimension: %d\n", final_d);
-        point_t* opt_p = max_utility(skyline_D_prime, u_final, s, epsilon, num_questions, Qcount, Csize, cmp_option, stop_option, prune_option, dom_option);
-        S_output->points[0] = skyline->points[opt_p->id];
+        
+        // Create a mapping from original dimensions to reduced dimensions
+        std::map<int, int> dim_mapping;
+        int reduced_dim = 0;
+        for (int dim : set_final_dimensions) {
+            dim_mapping[dim] = reduced_dim++;
+        }
+        
+        // Use max_utility_with_questions instead of max_utility to incorporate pre-recorded questions
+        point_t* opt_p = max_utility_with_questions(skyline_D_prime, u_final, s, epsilon, num_questions, Qcount, Csize, cmp_option, stop_option, prune_option, dom_option, qm, dim_mapping, D_prime);
+        // Find the point in skyline that matches the id of opt_p
+        point_t* matched_point = nullptr;
+        for (int i = 0; i < skyline->numberOfPoints; ++i) {
+            if (skyline->points[i]->id == opt_p->id) {
+                matched_point = skyline->points[i];
+                break;
+            }
+        }
+        if (matched_point == nullptr) {
+            printf("Error: Could not find point in skyline with id %d\n", opt_p->id);
+            exit(1);
+        }
+        S_output->points[0] = matched_point;
         num_questions -= Qcount;
     }
 	else {
-        if (final_d >= K){
-            // exit
-            printf("error: final_d >= K\n");
-            exit(1);
-        }
+        // if (final_d >= K){
+        //     // exit
+        //     printf("error: final_d >= K\n");
+        //     exit(1);
+        // }
         // printf("Applying the attribute subset method to output a regret minimizing subset\n");
         if (final_d <= d_hat_2){
             point_set_t* S = sphereWSImpLP(skyline_D_prime, K);
             S_output = alloc_point_set(S->numberOfPoints);
             for (int j = 0; j < S->numberOfPoints; ++j){
-                S_output->points[j] = skyline->points[S->points[j]->id];
+                // Find the point in skyline with the corresponding id
+                int target_id = S->points[j]->id;
+                point_t* matched_point = nullptr;
+                for (int i = 0; i < skyline->numberOfPoints; ++i) {
+                    if (skyline->points[i]->id == target_id) {
+                        matched_point = skyline->points[i];
+                        break;
+                    }
+                }
+                if (matched_point == nullptr) {
+                    printf("Error: Could not find point in skyline with id %d\n", target_id);
+                    exit(1);
+                }
+                S_output->points[j] = matched_point;
             }
         }
         else {

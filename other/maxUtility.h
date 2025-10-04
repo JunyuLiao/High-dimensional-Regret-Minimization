@@ -7,6 +7,7 @@
 
 #include <vector>
 #include <algorithm> 
+#include <map>
 
 #include "rtree.h"
 #include "lp.h"
@@ -19,6 +20,12 @@
 
 using namespace std;
 
+// Data structure to store question mappings
+// Maps set of dimensions to vector of presented tuple indices (first one is user's choice)
+struct question_mapping {
+    std::map<std::set<int>, std::vector<int>> questions;
+};
+
 // get the index of the "current best" point
 int get_current_best_pt(point_set_t* P, vector<int>& C_idx, vector<point_t*>& ext_vec);
 
@@ -30,5 +37,11 @@ vector<int> generate_S(point_set_t* P, vector<int>& C_idx, int s, int current_be
 
 // the main interactive algorithm
 point_t* max_utility(point_set_t* P, point_t* u, int s,  double epsilon, int maxRound, double &Qcount, double &Csize,  int cmp_option, int stop_option, int prune_option, int dom_option);
+
+// the main interactive algorithm with pre-recorded questions
+point_t* max_utility_with_questions(point_set_t* P, point_t* u, int s, double epsilon, int maxRound, double &Qcount, double &Csize, int cmp_option, int stop_option, int prune_option, int dom_option, const question_mapping& qm, const std::map<int, int>& dim_mapping, point_set_t* D_prime);
+
+// construct extreme vectors from question mappings
+void construct_ext_vec_from_questions(point_set_t* P, const question_mapping& qm, point_t* u, vector<point_t*>& ext_vec, int full_dim, const std::map<int, int>& dim_mapping, point_set_t* D_prime);
 
 #endif

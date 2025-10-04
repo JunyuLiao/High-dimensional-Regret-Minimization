@@ -31,6 +31,7 @@ int main(int argc, char *argv[]){
 	// reduce_to_unit(P);
 	int d = P->points[0]->dim;
 	point_set_t* skyline = skyline_point(P);
+
 	int size = 2; // question size
 	int d_prime = atoi(argv[2]); // number of dimensions in the utility vector
 	int d_hat = atoi(argv[3]); // number of dimensions in the cover in phase 1 (d_hat_1)
@@ -77,18 +78,18 @@ int main(int argc, char *argv[]){
 		u->coord[i] /= sum;
 	}
 
-	// look for the ground truth maximum utility point
-	int maxIdx = 0;
-	double maxValue = 0;
-	for(int i = 0; i < skyline->numberOfPoints; i++)
-	{
-		double value = dot_prod(u, skyline->points[i]);
-		if(value > maxValue)
-		{
-			maxValue = value;
-			maxIdx = i;
-		}
-	}
+	// // look for the ground truth maximum utility point
+	// int maxIdx = 0;
+	// double maxValue = 0;
+	// for(int i = 0; i < skyline->numberOfPoints; i++)
+	// {
+	// 	double value = dot_prod(u, skyline->points[i]);
+	// 	if(value > maxValue)
+	// 	{
+	// 		maxValue = value;
+	// 		maxIdx = i;
+	// 	}
+	// }
 
 	highdim_output* h = interactive_highdim(skyline, size, d_bar, d_hat, d_hat_2, u, K, s, epsilon, maxRound, Qcount, Csize, cmp_option, stop_option, prune_option, dom_option, num_questions);
 	double time_12 = h->time_12;
@@ -109,37 +110,90 @@ int main(int argc, char *argv[]){
 		printf("Phase 3B: \n");
 		K_sphere = K;
 	}
+
+	for (int i = 0; i < 40; ++i) printf("-"); printf("\n");
+	printf("|%7s |%13s |%5s | %5s |\n", "Method", "Regret Ratio", "Time", "Size");
+	for (int i = 0; i < 40; ++i) printf("-"); printf("\n");
+	double mrr = evaluateLP(skyline, S, 0, u);
+	printf("|%7s |%13.3lf |%5.2lf | %5d |\n", "OurAlg", mrr, time_12+time_3, S->numberOfPoints);
+
 	// for comparison, test the mrr returned by the Sphere algorithm
 	// construct the dataset with the final dimensions
 	point_set_t* D_test = alloc_point_set(n);
 	for (int i = 0; i < n; i++) {
 		D_test->points[i] = alloc_point(final_dimensions.size());
-		D_test->points[i]->id = skyline->points[i]->id;
+		// Set the ID to be the array index so we can map back correctly
+		D_test->points[i]->id = i;
 		int j = 0;
 		for (auto dim : final_dimensions) {
 			D_test->points[i]->coord[j++] = skyline->points[i]->coord[dim];
 		}
 	}
 	// record the time in seconds
-	auto start_time_sphere = std::chrono::high_resolution_clock::now();
-	point_set_t* skyline_D_test = skyline_point(D_test);
-	point_set_t* S_test = sphereWSImpLP(skyline_D_test, K_sphere);
-	auto end_time_sphere = std::chrono::high_resolution_clock::now();
-	std::chrono::duration<double> duration_sphere = end_time_sphere - start_time_sphere;
-	double time_sphere = duration_sphere.count();
+	if (final_dimensions.size() <= K_sphere){
+		auto start_time_sphere = std::chrono::high_resolution_clock::now();
+		point_set_t* skyline_D_test = skyline_point(D_test);
+		point_set_t* S_test = sphereWSImpLP(skyline_D_test, K_sphere);
+		auto end_time_sphere = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<double> duration_sphere = end_time_sphere - start_time_sphere;
+		double time_sphere = duration_sphere.count();
 
-	// revert S_test to the original dimensions
-	for (int i = 0; i < S_test->numberOfPoints; i++){
-		S_test->points[i] = skyline->points[S_test->points[i]->id];
+		point_set_t* S_test_original = alloc_point_set(S_test->numberOfPoints);
+		int valid_index = 0;
+		for (int i = 0; i < S_test->numberOfPoints; i++){
+			int target_id = S_test->points[i]->id;
+			
+			// Find the point in skyline_D_test with this ID
+			int skyline_index = -1;
+			for (int j = 0; j < skyline_D_test->numberOfPoints; j++) {
+				if (skyline_D_test->points[j]->id == target_id) {
+					skyline_index = j;
+					break;
+				}
+			}
+			
+			if (skyline_index == -1) {
+				continue;
+			}
+			
+			// Get the corresponding point from D_test (which has the array index)
+			point_t* D_test_point = skyline_D_test->points[skyline_index];
+			int original_skyline_index = D_test_point->id;
+			
+			if (original_skyline_index < 0 || original_skyline_index >= skyline->numberOfPoints) {
+				continue;
+			}
+			
+			// Create a new point with original dimensions
+			point_t* original_point = skyline->points[original_skyline_index];
+			if (original_point == NULL) {
+				continue;
+			}
+			
+			point_t* new_point = alloc_point(original_point->dim);
+			new_point->id = original_point->id;
+			for (int j = 0; j < original_point->dim; j++) {
+				new_point->coord[j] = original_point->coord[j];
+			}
+			S_test_original->points[valid_index++] = new_point;
+		}
+		double mrr_test = evaluateLP(skyline, S_test_original, 0, u);
+		
+		for (int i = 0; i < 40; ++i) printf("-"); printf("\n");
+		printf("|%7s |%13.3lf |%5.2lf | %5d |\n", "Sphere", mrr_test, time_12+time_sphere, S_test->numberOfPoints);
+	    
+		release_point_set(skyline_D_test, false);
+		release_point_set(S_test, false); // Don't clear since points are references
+		release_point_set(S_test_original, true);
 	}
-	double mrr_test = evaluateLP(skyline, S_test, 0, u);
-	for (int i = 0; i < 40; ++i) printf("-"); printf("\n");
-	printf("|%7s |%13s |%5s | %5s |\n", "Method", "Regret Ratio", "Time", "Size");
-	for (int i = 0; i < 40; ++i) printf("-"); printf("\n");
-	printf("|%7s |%13.3lf |%5.2lf | %5d |\n", "Sphere", mrr_test, time_12+time_sphere, S_test->numberOfPoints);
-	for (int i = 0; i < 40; ++i) printf("-"); printf("\n");
-	double mrr = evaluateLP(skyline, S, 0, u);
-	printf("|%7s |%13.3lf |%5.2lf | %5d |\n", "OurAlg", mrr, time_12+time_3, S->numberOfPoints);
+	
+	
+
+
+	// Create a new point set with original dimensions
+	// The IDs in S_test->points[i] are the original IDs from the input points
+	// We need to find the points in skyline_D_test that have those IDs
+	
 	for (int i = 0; i < 40; ++i) printf("-"); printf("\n");
 	printf("number of questions: %d\n", num_quest_init-num_questions); // 555
 
@@ -147,6 +201,7 @@ int main(int argc, char *argv[]){
 	release_point(u);
 	release_point_set(h->S, false);
 	release_point_set(P, true);
+	release_point_set(D_test, true);
 	delete h;
 	
 	return 0;

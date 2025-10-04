@@ -1,16 +1,22 @@
 # Ignore dataset, output, and plot folders
-datasets/
+datasets/synthetic/
 output/
 plot/
 result/
+scal_1/
+scal_2/
 plot_old/
 experiment/
 
+# Ignore specific dataset
+datasets/e100-100k.txt
+
 # ignore scripts
-script_inter.py
 script.py
 data_collector.py
 gnuplot_generator.py
+test_scalability.py
+vary.py
 run_pipeline.py
 
 # macOS system files
@@ -75,5 +81,6 @@ Desktop.ini
 # Test files
 run.dSYM/
 run.dSYM.ziprun
+run.dSYM.zip
 
 # 

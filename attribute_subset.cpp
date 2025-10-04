@@ -17,7 +17,7 @@ point_set_t* attribute_subset(point_set_t* skyline, point_set_t* S_output, int f
 
     while (S_output == nullptr || S_output->numberOfPoints < K){
         num_rounds++;
-        if (num_rounds > 30){
+        if (num_rounds > 50){
             // exit if the number of rounds exceeds 30
             // printf("rounds exceeded 30, exiting...\n");
             break;
@@ -77,6 +77,7 @@ point_set_t* attribute_subset(point_set_t* skyline, point_set_t* S_output, int f
         release_point_set(S, false);
         release_point_set(S_hat, true);
     }
+    printf("number of rounds: %d\n", num_rounds);
     if (S_output->numberOfPoints > K){
         // if the size of S_output is larger than K, keep only the first K points
         point_set_t* temp = alloc_point_set(K);
