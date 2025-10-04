@@ -1,16 +1,15 @@
 # High-dimensional Regret Minimization
 
-This repository implements an **interactive k-regret minimization** algorithm tailored for **high-dimensional** datasets where only a small subset of attributes (dimensions) truly influence user utility. By progressively reducing dimensions through two user-guided phases, the algorithm efficiently narrows down to the relevant $d'$ features before executing a final regret-minimization step.
+This repository implements an **interactive k-regret minimization** algorithm tailored for **high-dimensional** datasets where only a small subset of attributes (dimensions) truly influence user utility. By progressively reducing dimensions through two user-guided phases, the algorithm efficiently narrows down to the relevant features before executing a final regret-minimization step.
 
 ## Features
 
 * **Two-Phase Dimension Reduction**
 
-  * **Phase 1 (Coarse Elimination):** Quickly discards irrelevant attributes in blocks of size $\hat d$ via user feedback on small batches of tuples.
-  * **Phase 2 (Fine Selection):** Pinpoints the exact set of $d'$ nonzero dimensions using an adaptive group-testing strategy and direct yes/no tests when only one candidate remains.
-* **Interactive Queries**: Presents users with $s$-tuple forced-choice tasks (plus a "None apply" option) to ensure natural, low-cognitive-load responses.
-* **Final Regret Minimization**: Runs a standard k-regret algorithm on the reduced $d'$-dimensional subspace, guaranteeing low worst-case regret ratio.
-* **Robust to Partial Feedback**: Gracefully handles skipped or incomplete answers by jumping to the final stage with whatever candidate set is available.
+  * **Phase 1 (Coarse Elimination):** Quickly discards irrelevant attributes in blocks.
+  * **Phase 2 (Fine Selection):** Pinpoints the key dimensions (the dimensions with non-zero weights) using an adaptive group-testing strategy.
+* **Best Point Determination**: Returns the user their favorite option, with much fewer questions needed compared to existing works.
+* **Robust to Partial Feedback**: Gracefully handles skipped or incomplete answers using whatever candidate set is available, with our proposed _AttributeSubset_ algorithm.
 
 ## Repository Structure
 
@@ -28,7 +27,6 @@ This repository implements an **interactive k-regret minimization** algorithm ta
 ├── highdim.h             # High-dimensional 
 ├── attribute_subset.cpp  # Attribute subset 
 ├── attribute_subset.h    # Attribute subset 
-├── script.py             # Main experimental 
 ├── Makefile              # Build configuration
 └── README.md             # This documentation
 ```
@@ -46,8 +44,8 @@ This repository implements an **interactive k-regret minimization** algorithm ta
 
 ## Reproducibility:
 
-To reproduce the experiments in the paper 'High-dimensional Regret Minimization', use 
+To run the algorithm in the paper 'High-dimensional Regret Minimization', use 
 
-python script.py <dataset_path> <d_prime> <d_hat_1> <d_hat_2> <rounds>
+./run <dataset_path> <d_int> <m> <w> <K> <q>
 
-which will run the code 100 times and report the average performance, with the parameters above and all other parameters as default.
+For example, "./run datasets/e100-10k.txt 3 7 6 1 35" will run the algorithm on synthetic dataset of n=10k, d=100, with 35 questions allowed and output size 1. The output also contains results from _Sphere-Adapt_ (as introduced in our paper) for comparison, if it can be executed normally.

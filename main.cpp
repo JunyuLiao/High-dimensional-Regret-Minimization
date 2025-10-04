@@ -23,7 +23,7 @@ using namespace std;
 
 //interactive version
 int main(int argc, char *argv[]){
-	if (argc != 8) return 0;
+	if (argc != 7) return 0;
 	char* input = argv[1];
 	point_set_t* P = read_points(input);
 	int n = P->numberOfPoints;
@@ -44,7 +44,7 @@ int main(int argc, char *argv[]){
 	// below are default parameters from the interactive paper
 	//-------------------------------------
 	int s = 3; //question size in interactive algorithm (3 as default)
-	double epsilon = atof(argv[7]);
+	double epsilon = 0.0;
 	int maxRound = 1000;
 	double Qcount, Csize;
 	int prune_option = RTREE;
