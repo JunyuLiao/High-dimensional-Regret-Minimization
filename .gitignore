@@ -1,6 +1,7 @@
 # Ignore dataset, output, and plot folders
 datasets/synthetic/
 output/
+real/
 plot/
 result/
 scal_1/
