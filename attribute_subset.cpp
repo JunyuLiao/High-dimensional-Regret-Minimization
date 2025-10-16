@@ -67,11 +67,17 @@ point_set_t* attribute_subset(point_set_t* skyline, point_set_t* S_output, int f
         std::vector<int> union_indices(set_union.begin(), set_union.end());
         for (int j=0; j<set_union.size(); ++j){
             int match_id = union_indices[j];
+            bool found = false;
             for (int k=0; k<skyline->numberOfPoints; ++k){
                 if (skyline->points[k]->id == match_id){
                     S_output->points[j] = skyline->points[k];
+                    found = true;
                     break;
                 }
+            }
+            if (!found) {
+                printf("Error: Could not find point with id %d in skyline\n", match_id);
+                S_output->points[j] = nullptr; // Explicitly set to null for debugging
             }
         }
         release_point_set(S, false);
@@ -109,7 +115,19 @@ point_set_t* attribute_subset(point_set_t* skyline, point_set_t* S_output, int f
         // construct the new S_output
         S_output = alloc_point_set(K);
         for (int i = 0; i < K; ++i){
-            S_output->points[i] = skyline->points[*next(point_ids.begin(), i)];
+            int point_id = *next(point_ids.begin(), i);
+            bool found = false;
+            for (int j = 0; j < skyline->numberOfPoints; ++j) {
+                if (skyline->points[j]->id == point_id) {
+                    S_output->points[i] = skyline->points[j];
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                printf("Error: Could not find point with id %d in skyline (final section)\n", point_id);
+                S_output->points[i] = nullptr; // Explicitly set to null for debugging
+            }
         }
     }
     return S_output;

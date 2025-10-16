@@ -968,13 +968,28 @@ double evaluateLP(point_set_t *p, point_set_t* S, int VERBOSE)
 }
 
 double evaluateLP(point_set_t *p, point_set_t* S, int VERBOSE, point_t* u){
+    if (p == nullptr || S == nullptr || u == nullptr) {
+        printf("Error: evaluateLP called with null parameters\n");
+        return -1.0;
+    }
+    
     double maxK, maxN;
     double* v = new double[u->dim];
     for (int i = 0; i < u->dim; ++i){
         v[i] = u->coord[i];
     }
-    maxK = dot_prod(maxPoint(S, v), u);
-    maxN = dot_prod(maxPoint(p, v), u);
+    
+    point_t* maxPointS = maxPoint(S, v);
+    point_t* maxPointP = maxPoint(p, v);
+    
+    if (maxPointS == nullptr || maxPointP == nullptr) {
+        printf("Error: maxPoint returned null in evaluateLP\n");
+        delete[]v;
+        return -1.0;
+    }
+    
+    maxK = dot_prod(maxPointS, u);
+    maxN = dot_prod(maxPointP, u);
     double maxRegret = 1.0 - maxK / maxN;
 
     if (VERBOSE)

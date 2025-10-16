@@ -272,17 +272,62 @@ bool isViolated(point_t* normal_q, point_t* normal_p, point_t* e) {
 }
 
 point_t* maxPoint(point_set_t* p, double* v) {
+    if (p == nullptr) {
+        printf("Error: maxPoint called with null point_set_t\n");
+        return nullptr;
+    }
+    
     int N = p->numberOfPoints;
+    if (N <= 0) {
+        printf("Error: maxPoint called with empty point set (N=%d)\n", N);
+        return nullptr;
+    }
+    
     int maxIndex = 0;
     double max = 0.0;
     
     for (int i = 0; i < N; ++i) {
+        if (p->points[i] == nullptr) {
+            printf("Error: maxPoint found null point at index %d\n", i);
+            return nullptr;
+        }
         if (dot_prod(p->points[i], v) > max) {
             maxIndex = i;
             max = dot_prod(p->points[i], v);
         }
     }
     return p->points[maxIndex];
+}
+
+// Remove null points from a point set
+point_set_t* remove_null_points(point_set_t* p) {
+    if (p == nullptr) {
+        return nullptr;
+    }
+    
+    // Count non-null points
+    int valid_count = 0;
+    for (int i = 0; i < p->numberOfPoints; ++i) {
+        if (p->points[i] != nullptr) {
+            valid_count++;
+        }
+    }
+    
+    if (valid_count == p->numberOfPoints) {
+        return p; // No null points to remove
+    }
+    
+    // Create new point set with only valid points
+    point_set_t* result = alloc_point_set(valid_count);
+    int result_index = 0;
+    for (int i = 0; i < p->numberOfPoints; ++i) {
+        if (p->points[i] != nullptr) {
+            result->points[result_index] = p->points[i];
+            result_index++;
+        }
+    }
+    
+    return result;
 }
 
 // Gauss elimination for N x D matrix

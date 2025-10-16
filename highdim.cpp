@@ -372,7 +372,7 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
 	point_set_t* S_output = nullptr;
 
 	int final_d = set_final_dimensions.size();
-    printf("number of final dimensions: %d\n", final_d);
+    printf("number of dimensions left in Candidate Set: %d\n", final_d);
 	point_set_t* D_prime = alloc_point_set(n);
 	for (int j=0;j<n;++j){
 		D_prime->points[j] = alloc_point(final_d);
@@ -460,6 +460,21 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
     auto end_time_3 = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration_3 = end_time_3 - start_time_3;
     time_3 = duration_3.count();
+    
+    // Safety check: ensure S_output is not null
+    if (S_output == nullptr) {
+        printf("Error: S_output is null, creating empty point set\n");
+        S_output = alloc_point_set(0);
+    }
+    
+    // Remove any null points from S_output
+    point_set_t* cleaned_S_output = remove_null_points(S_output);
+    if (cleaned_S_output != S_output) {
+        printf("Warning: Removed null points from S_output\n");
+        release_point_set(S_output, false);
+        S_output = cleaned_S_output;
+    }
+    
     //also return the information about the dimensions chosen, as stored in set_final_dimensions
     highdim_output* output = new highdim_output;
     output->S = S_output;

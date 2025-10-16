@@ -36,6 +36,7 @@ float rand_f(float min_v, float max_v);
 DIST_TYPE calc_dist(point_t* point_v1, point_t* point_v2);
 bool isViolated(point_t* normal_q, point_t* normal_p, point_t* e);
 point_t* maxPoint(point_set_t* p, double *v);
+point_set_t* remove_null_points(point_set_t* p);
 vector<double> gaussNtimesD(vector<vector<double>> A);
 point_t* projectPointsOntoAffineSpace(point_set_t* space, point_t* p);
 Vvi build_input(int t, int dim);
