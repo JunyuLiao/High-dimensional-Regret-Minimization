@@ -1,5 +1,7 @@
 # High-dimensional Regret Minimization
 
+[![arXiv](https://img.shields.io/badge/arXiv-2512.24078-b31b1b.svg)](https://arxiv.org/abs/2512.24078)
+
 This repository implements an **interactive k-regret minimization** algorithm tailored for **high-dimensional** datasets where only a small subset of attributes (dimensions) truly influence user utility. By progressively reducing dimensions through two user-guided phases, the algorithm efficiently narrows down to the relevant features before executing a final regret-minimization step.
 
 ## Features
