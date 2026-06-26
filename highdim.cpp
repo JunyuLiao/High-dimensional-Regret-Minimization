@@ -1,5 +1,147 @@
 #include "highdim.h"
 
+namespace {
+
+std::vector<int> dimension_range(int start, int count){
+    std::vector<int> dimensions;
+    for (int i = 0; i < count; ++i) {
+        dimensions.push_back(start + i);
+    }
+    return dimensions;
+}
+
+std::vector<int> selected_dimension_slice(const std::set<int>& selected_dimensions, int start, int count){
+    std::vector<int> dimensions;
+    for (int i = 0; i < count; ++i) {
+        dimensions.push_back(*next(selected_dimensions.begin(), start + i));
+    }
+    return dimensions;
+}
+
+point_set_t* project_points(point_set_t* source, const std::vector<int>& dimensions){
+    point_set_t* projected = alloc_point_set(source->numberOfPoints);
+    for (int i = 0; i < source->numberOfPoints; ++i){
+        projected->points[i] = alloc_point(dimensions.size());
+        projected->points[i]->id = source->points[i]->id;
+        for (int j = 0; j < dimensions.size(); ++j){
+            projected->points[i]->coord[j] = source->points[i]->coord[dimensions[j]];
+        }
+    }
+    return projected;
+}
+
+point_set_t* select_random_points(point_set_t* D, int size){
+    point_set_t* S = alloc_point_set(size);
+    // create a random number generator
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<int> dis(0, D->numberOfPoints-1);
+    // select size points from D
+    for (int i = 0; i < size; ++i) {
+        int idx = dis(gen);
+        S->points[i] = D->points[idx];
+    }
+    return S;
+}
+
+point_t* project_utility(point_t* u, const std::vector<int>& dimensions){
+    point_t* u_hat = alloc_point(dimensions.size());
+    for (int i = 0; i < dimensions.size(); ++i) {
+        u_hat->coord[i] = u->coord[dimensions[i]];
+    }
+    return u_hat;
+}
+
+int simulated_choice_id(point_set_t* S, point_t* u_hat){
+    double maxValue = 0;
+    int maxIdx = 0;
+    for (int i = 0; i < S->numberOfPoints; i++) {
+        double value = dot_prod(u_hat, S->points[i]);
+        if (value > maxValue) {
+            maxValue = value;
+            maxIdx = i;
+        }
+    }
+    return maxValue > 0 ? S->points[maxIdx]->id : -1;
+}
+
+void record_question(question_mapping& qm, const std::vector<int>& dimensions, point_set_t* S, int id){
+    // Record the question: dimensions shown and tuple indices (selected first)
+    std::set<int> question_dims(dimensions.begin(), dimensions.end());
+    std::vector<int> tuple_indices;
+    if (id != -1) {
+        // Add selected point first, then others
+        tuple_indices.push_back(id);
+        for (int i = 0; i < S->numberOfPoints; ++i) {
+            if (S->points[i]->id != id) {
+                tuple_indices.push_back(S->points[i]->id);
+            }
+        }
+    }
+    qm.questions[question_dims] = tuple_indices;
+}
+
+int ask_projected_question(point_set_t* skyline, point_t* u, const std::vector<int>& dimensions, int size, question_mapping& qm){
+    point_set_t* D = project_points(skyline, dimensions);
+    point_set_t* S = select_random_points(D, size);
+    point_t* u_hat = project_utility(u, dimensions);
+    int id = simulated_choice_id(S, u_hat);
+
+    record_question(qm, dimensions, S, id);
+
+    release_point(u_hat);
+    release_point_set(S, false);
+    release_point_set(D, true);
+    return id;
+}
+
+std::set<int> combine_candidate_dimensions(const std::set<int>& final_dimensions, const std::set<int>& selected_dimensions, int d_bar){
+    std::set<int> set_final_dimensions;
+    if (selected_dimensions.size() == 0 || final_dimensions.size() == d_bar){
+        set_final_dimensions = final_dimensions;
+    }
+    else {
+        std::set_union(final_dimensions.begin(), final_dimensions.end(),
+            selected_dimensions.begin(), selected_dimensions.end(),
+            std::inserter(set_final_dimensions, set_final_dimensions.begin()));
+    }
+    return set_final_dimensions;
+}
+
+std::map<int, int> build_dimension_mapping(const std::set<int>& dimensions){
+    std::map<int, int> dim_mapping;
+    int reduced_dim = 0;
+    for (int dim : dimensions) {
+        dim_mapping[dim] = reduced_dim++;
+    }
+    return dim_mapping;
+}
+
+point_t* find_point_by_id(point_set_t* points, int id){
+    for (int i = 0; i < points->numberOfPoints; ++i) {
+        if (points->points[i]->id == id) {
+            return points->points[i];
+        }
+    }
+    return nullptr;
+}
+
+point_set_t* map_sphere_result_to_skyline(point_set_t* skyline, point_set_t* S){
+    point_set_t* S_output = alloc_point_set(S->numberOfPoints);
+    for (int i = 0; i < S->numberOfPoints; ++i){
+        // Find the point in skyline with the corresponding id
+        int target_id = S->points[i]->id;
+        point_t* matched_point = find_point_by_id(skyline, target_id);
+        if (matched_point == nullptr) {
+            printf("Error: Could not find point in skyline with id %d\n", target_id);
+            exit(1);
+        }
+        S_output->points[i] = matched_point;
+    }
+    return S_output;
+}
+
+} // namespace
 
 highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, int d_hat, int d_hat_2, point_t* u, int K, int s, double epsilon, int maxRound, double& Qcount, double& Csize, int cmp_option, int stop_option, int prune_option, int dom_option, int& num_questions){
 
@@ -18,69 +160,16 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
 	std::set<int> selected_dimensions;
     for (int i = 0; i < d; ++i) selected_dimensions.insert(i); // initial all dimensions
 
+    // Keep the original full-block behavior; tail dimensions remain selected when d is not divisible by d_hat.
 	for (int i=0;i<d/d_hat;++i){
         // first check if the user is willing to answer questions
         if (num_questions <= 0){
             break; // no more questions left
         }
 		//Restrict D to dimensions i*d_hat, i*d_hat+1, ..., i*d_hat+d_hat-1
-		point_set_t* D = alloc_point_set(n);
-		for (int j=0;j<n;++j){
-			D->points[j] = alloc_point(d_hat);
-			D->points[j]->id = skyline->points[j]->id;
-			for (int p=0;p<d_hat;++p){
-				D->points[j]->coord[p] = skyline->points[j]->coord[i*d_hat+p];
-			}
-		}
-		point_set_t* S = alloc_point_set(size);
-        // select randomly size points from D
-        // create a random number generator
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        std::uniform_int_distribution<int> dis(0, n-1);
-        // select size points from D
-        for (int j = 0; j < size; ++j) {
-            int idx = dis(gen);
-            S->points[j] = D->points[idx];
-        }
-		// interaction
-		// int id = -1; //user's choice, -1 means no choice
-        // for the purpose of testing, we will select the id based on the utility vector u
-        double maxValue = 0;
-        int maxIdx = 0;
-        // create a subset of u with d_hat dimensions
-        point_t* u_hat = alloc_point(d_hat);
-        for (int j = 0; j < d_hat; ++j) {
-            u_hat->coord[j] = u->coord[i*d_hat+j];
-        }
-        for (int j = 0; j < S->numberOfPoints; j++) {
-            double value = dot_prod(u_hat, S->points[j]);
-            if (value > maxValue) {
-                maxValue = value;
-                maxIdx = j;
-            }
-        }
-        int id = maxValue > 0 ? S->points[maxIdx]->id : -1;
+        std::vector<int> dimensions = dimension_range(i*d_hat, d_hat);
+        int id = ask_projected_question(skyline, u, dimensions, size, qm);
         num_questions -= 1;
-        
-        // Record the question: dimensions shown and tuple indices (selected first)
-        std::set<int> question_dims;
-        for (int j = 0; j < d_hat; ++j) {
-            question_dims.insert(i*d_hat + j);
-        }
-        std::vector<int> tuple_indices;
-        if (id != -1) {
-            // Add selected point first, then others
-            tuple_indices.push_back(id);
-            for (int j = 0; j < S->numberOfPoints; ++j) {
-                if (S->points[j]->id != id) {
-                    tuple_indices.push_back(S->points[j]->id);
-                }
-            }
-        }
-        qm.questions[question_dims] = tuple_indices;
-        
-        release_point(u_hat);
         
 		if (id==-1){
 			// for (int j=0;j<d_hat;++j) selected_dimensions.erase(i*d_hat+j);
@@ -89,8 +178,6 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
                 selected_dimensions.erase(dim_to_remove);
             }
 		}
-		release_point_set(S, false);
-        release_point_set(D, true);
 	}
 	// phase 2: narrow down the at most d_hat*d' dimensions further
     // printf("Phase 2\n"); // 222
@@ -155,65 +242,9 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
             }
             else {
                 // select the first size dimensions
-                point_set_t* D = alloc_point_set(n);
-                for (int j=0;j<n;++j){
-                    D->points[j] = alloc_point(group_size);
-                    D->points[j]->id = skyline->points[j]->id;
-                    for (int p=0;p<group_size;++p){
-                        D->points[j]->coord[p] = skyline->points[j]->coord[*next(selected_dimensions.begin(), p)];
-                    }
-                }
-                point_set_t* S = alloc_point_set(size);
-                // select randomly size points from D
-                // create a random number generator
-                std::random_device rd;
-                std::mt19937 gen(rd());
-                std::uniform_int_distribution<int> dis(0, n-1);
-                // select size points from D
-                for (int j = 0; j < size; ++j) {
-                    int idx = dis(gen);
-                    S->points[j] = D->points[idx];
-                }
-                // insert interaction
-                // int id = -1; //user's choice, -1 means no choice
-                // for the purpose of testing, we will select the id based on the utility vector u
-                double maxValue = 0;
-                int maxIdx = 0;
-                // create a subset of u with group_size dimensions
-                point_t* u_hat = alloc_point(group_size);
-                for (int j = 0; j < group_size; ++j) {
-                    u_hat->coord[j] = u->coord[*next(selected_dimensions.begin(), j)];
-                }   
-                for (int j = 0; j < S->numberOfPoints; j++) {
-                    double value = dot_prod(u_hat, S->points[j]);
-                    if (value > maxValue) { 
-                        maxValue = value;
-                        maxIdx = j;
-                    }
-                }
-                id = maxValue > 0 ? S->points[maxIdx]->id : -1;
+                std::vector<int> dimensions = selected_dimension_slice(selected_dimensions, 0, group_size);
+                id = ask_projected_question(skyline, u, dimensions, size, qm);
                 num_questions -= 1;
-                
-                // Record the question: dimensions shown and tuple indices (selected first)
-                std::set<int> question_dims;
-                for (int j = 0; j < group_size; ++j) {
-                    question_dims.insert(*next(selected_dimensions.begin(), j));
-                }
-                std::vector<int> tuple_indices;
-                if (id != -1) {
-                    // Add selected point first, then others
-                    tuple_indices.push_back(id);
-                    for (int j = 0; j < S->numberOfPoints; ++j) {
-                        if (S->points[j]->id != id) {
-                            tuple_indices.push_back(S->points[j]->id);
-                        }
-                    }
-                }
-                qm.questions[question_dims] = tuple_indices;
-                
-                release_point(u_hat);
-                release_point_set(S, false);
-                release_point_set(D, true);
             }
 			if (id == -1){
 				for (int j=0;j<group_size;++j){
@@ -269,65 +300,9 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
                                 break;
                             }
                         }
-                        point_set_t* D = alloc_point_set(n);
-                        for (int j=0;j<n;++j){
-                            D->points[j] = alloc_point(mid - left + 1);
-                            D->points[j]->id = skyline->points[j]->id;
-                            for (int p=0; p < mid-left+1; ++p){
-                                D->points[j]->coord[p] = skyline->points[j]->coord[*next(selected_dimensions.begin(), left+p)];
-                            }
-                        }
-                        point_set_t* S = alloc_point_set(size);
-                        // select randomly size points from D
-                        // create a random number generator
-                        std::random_device rd;
-                        std::mt19937 gen(rd());
-                        std::uniform_int_distribution<int> dis(0, n-1);
-                        // select size points from D
-                        for (int j = 0; j < size; ++j) {
-                            int idx = dis(gen);
-                            S->points[j] = D->points[idx];
-                        }
-                        // insert interaction
-                        // int id = -1; //user's choice, -1 means no choice
-                        // for the purpose of testing, we will select the id based on the utility vector u
-                        double maxValue = 0;
-                        int maxIdx = 0;
-                        // create a subset of u with mid - left + 1 dimensions
-                        point_t* u_hat = alloc_point(mid - left + 1);
-                        for (int j = 0; j < mid-left+1; ++j) {
-                            u_hat->coord[j] = u->coord[*next(selected_dimensions.begin(), left+j)];
-                        }
-                        for (int j = 0; j < S->numberOfPoints; j++) {
-                            double value = dot_prod(u_hat, S->points[j]);
-                            if (value > maxValue) {
-                                maxValue = value;
-                                maxIdx = j; 
-                            }
-                        }
-                        int id = maxValue > 0 ? S->points[maxIdx]->id : -1;
+                        std::vector<int> dimensions = selected_dimension_slice(selected_dimensions, left, mid - left + 1);
+                        int id = ask_projected_question(skyline, u, dimensions, size, qm);
                         num_questions -= 1;
-                        
-                        // Record the question: dimensions shown and tuple indices (selected first)
-                        std::set<int> question_dims;
-                        for (int j = 0; j < mid-left+1; ++j) {
-                            question_dims.insert(*next(selected_dimensions.begin(), left+j));
-                        }
-                        std::vector<int> tuple_indices;
-                        if (id != -1) {
-                            // Add selected point first, then others
-                            tuple_indices.push_back(id);
-                            for (int j = 0; j < S->numberOfPoints; ++j) {
-                                if (S->points[j]->id != id) {
-                                    tuple_indices.push_back(S->points[j]->id);
-                                }
-                            }
-                        }
-                        qm.questions[question_dims] = tuple_indices;
-                        
-                        release_point_set(S, false);
-                        release_point_set(D, true);
-                        release_point(u_hat);
                         
                         if (id == -1){
                             // the dimension is in the right half, remove all dimensions in the left half
@@ -359,28 +334,14 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
 	// phase 3: find the optimal tuple or the optimal subset
     // printf("Phase 3\n"); // 444
 	// take the union of the final_dimensions and the selected_dimensions
-	std::set<int> set_final_dimensions;
-    if (selected_dimensions.size() == 0 || final_dimensions.size() == d_bar){
-        set_final_dimensions = final_dimensions;
-    }
-    else {
-        std::set_union(final_dimensions.begin(), final_dimensions.end(),
-            selected_dimensions.begin(), selected_dimensions.end(),
-            std::inserter(set_final_dimensions, set_final_dimensions.begin()));
-    }
+	std::set<int> set_final_dimensions = combine_candidate_dimensions(final_dimensions, selected_dimensions, d_bar);
 	// construct the final subset
 	point_set_t* S_output = nullptr;
 
 	int final_d = set_final_dimensions.size();
     printf("number of dimensions left in Candidate Set: %d\n", final_d);
-	point_set_t* D_prime = alloc_point_set(n);
-	for (int j=0;j<n;++j){
-		D_prime->points[j] = alloc_point(final_d);
-		D_prime->points[j]->id = skyline->points[j]->id;
-		for (int p=0;p<final_d;++p){
-			D_prime->points[j]->coord[p] = skyline->points[j]->coord[*next(set_final_dimensions.begin(), p)];
-		}
-	}
+    std::vector<int> final_dimension_list(set_final_dimensions.begin(), set_final_dimensions.end());
+	point_set_t* D_prime = project_points(skyline, final_dimension_list);
 
     // take the skyline of the newly constructed dataset D_prime
     point_set_t* skyline_D_prime = skyline_point(D_prime);
@@ -388,10 +349,7 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
 
     // printf("number of points in skyline_D: %d\n", skyline_D_prime->numberOfPoints);
     // construct the final u
-    point_t* u_final = alloc_point(final_d);
-    for (int j = 0; j < final_d; ++j) {
-        u_final->coord[j] = u->coord[*next(set_final_dimensions.begin(), j)];
-    }
+    point_t* u_final = project_utility(u, final_dimension_list);
 
     double time_3 = 0.0;
     auto start_time_3 = std::chrono::high_resolution_clock::now();
@@ -402,22 +360,12 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
         // if (skyline_D_prime->points[0]->dim == final_d) printf("dimension: %d\n", final_d);
         
         // Create a mapping from original dimensions to reduced dimensions
-        std::map<int, int> dim_mapping;
-        int reduced_dim = 0;
-        for (int dim : set_final_dimensions) {
-            dim_mapping[dim] = reduced_dim++;
-        }
+        std::map<int, int> dim_mapping = build_dimension_mapping(set_final_dimensions);
         
         // Use max_utility_with_questions instead of max_utility to incorporate pre-recorded questions
         point_t* opt_p = max_utility_with_questions(skyline_D_prime, u_final, s, epsilon, num_questions, Qcount, Csize, cmp_option, stop_option, prune_option, dom_option, qm, dim_mapping, D_prime);
         // Find the point in skyline that matches the id of opt_p
-        point_t* matched_point = nullptr;
-        for (int i = 0; i < skyline->numberOfPoints; ++i) {
-            if (skyline->points[i]->id == opt_p->id) {
-                matched_point = skyline->points[i];
-                break;
-            }
-        }
+        point_t* matched_point = find_point_by_id(skyline, opt_p->id);
         if (matched_point == nullptr) {
             printf("Error: Could not find point in skyline with id %d\n", opt_p->id);
             exit(1);
@@ -434,23 +382,8 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
         // printf("Applying the attribute subset method to output a regret minimizing subset\n");
         if (final_d <= d_hat_2){
             point_set_t* S = sphereWSImpLP(skyline_D_prime, K);
-            S_output = alloc_point_set(S->numberOfPoints);
-            for (int j = 0; j < S->numberOfPoints; ++j){
-                // Find the point in skyline with the corresponding id
-                int target_id = S->points[j]->id;
-                point_t* matched_point = nullptr;
-                for (int i = 0; i < skyline->numberOfPoints; ++i) {
-                    if (skyline->points[i]->id == target_id) {
-                        matched_point = skyline->points[i];
-                        break;
-                    }
-                }
-                if (matched_point == nullptr) {
-                    printf("Error: Could not find point in skyline with id %d\n", target_id);
-                    exit(1);
-                }
-                S_output->points[j] = matched_point;
-            }
+            S_output = map_sphere_result_to_skyline(skyline, S);
+            release_point_set(S, false);
         }
         else {
             S_output = attribute_subset(skyline, S_output, final_d, d_hat_2, K, set_final_dimensions);
