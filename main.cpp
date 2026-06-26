@@ -31,6 +31,7 @@ int main(int argc, char *argv[]){
 	// reduce_to_unit(P);
 	int d = P->points[0]->dim;
 	point_set_t* skyline = skyline_point(P);
+	printf("number of skyline points: %d\n", skyline->numberOfPoints);
 
 	int size = 2; // question size
 	int d_prime = atoi(argv[2]); // number of dimensions in the utility vector
@@ -78,39 +79,6 @@ int main(int argc, char *argv[]){
 		u->coord[i] /= sum;
 	}
 
-	// printf("utility vector: \n");
-	// for (int i = 0; i < d; i++)
-	// {
-	// 	if (u->coord[i] != 0)
-	// 	{
-	// 		printf("%d %f; ", i, u->coord[i]);
-	// 	}
-	// }
-	// printf("\n");
-
-	// // look for the ground truth maximum utility point
-	// int maxIdx = 0;
-	// double maxValue = 0;
-	// for(int i = 0; i < skyline->numberOfPoints; i++)
-	// {
-	// 	double value = dot_prod(u, skyline->points[i]);
-	// 	if(value > maxValue)
-	// 	{
-	// 		maxValue = value;
-	// 		maxIdx = i;
-	// 	}
-	// }
-	// printf("ground truth maximum utility point: %d\n", skyline->points[maxIdx]->id);
-	// // print out the point
-	// for (int i = 0; i < d; i++)
-	// {
-	// 	if (u->coord[i] != 0)
-	// 	{
-	// 		printf("%d %f; ", i, skyline->points[maxIdx]->coord[i]);
-	// 	}
-	// }
-	// printf("\n");
-
 	highdim_output* h = interactive_highdim(skyline, size, d_bar, d_hat, d_hat_2, u, K, s, epsilon, maxRound, Qcount, Csize, cmp_option, stop_option, prune_option, dom_option, num_questions);
 	double time_12 = h->time_12;
 	double time_3 = h->time_3;
@@ -125,16 +93,7 @@ int main(int argc, char *argv[]){
 	if (S->numberOfPoints == 1){
 		printf("Phase 3A: \n");
 		K_sphere =  Qcount * s;
-		// printf("output id: %d\n", S->points[0]->id);
-		// // print out the point
-		// for (int i = 0; i < d; i++)
-		// {
-		// 	if (u->coord[i] != 0)
-		// 	{
-		// 		printf("%d %f; ", i, S->points[0]->coord[i]);
-		// 	}
-		// }
-		// printf("\n");
+		
 	}
 	else{
 		printf("Phase 3B: \n");
