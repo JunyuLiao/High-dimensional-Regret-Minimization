@@ -6,6 +6,7 @@
 #include "other/DMM.h"
 #include "other/lp.h"
 #include "highdim.h"
+#include "experiment_random.h"
 
 
 #include <iostream>
@@ -19,6 +20,9 @@ using namespace std;
 #include <set>
 #include <vector>
 #include <algorithm>
+#include <fstream>
+#include <iomanip>
+#include <string>
 
 namespace {
 
@@ -48,6 +52,32 @@ point_t* generate_sparse_utility(int d, int d_prime){
 	}
 
 	return u;
+}
+
+point_t* read_experiment_utility(const std::string& path, int dimension){
+	std::ifstream input(path);
+	point_t* utility = alloc_point(dimension);
+	for (int i = 0; i < dimension; ++i) {
+		if (!(input >> utility->coord[i])) {
+			release_point(utility);
+			return nullptr;
+		}
+	}
+	return utility;
+}
+
+void print_experiment_result(const char* method, double regret_ratio, double time_seconds,
+		int output_size, int questions){
+	std::cout << "EXPERIMENT_RESULT {\"method\":\"" << method
+		<< "\",\"status\":\"ok\",\"regret_ratio\":" << std::setprecision(17) << regret_ratio
+		<< ",\"time_seconds\":" << time_seconds
+		<< ",\"output_size\":" << output_size
+		<< ",\"questions\":" << questions << "}" << std::endl;
+}
+
+void print_unavailable_experiment_result(const char* method, const char* reason){
+	std::cout << "EXPERIMENT_RESULT {\"method\":\"" << method
+		<< "\",\"status\":\"unavailable\",\"reason\":\"" << reason << "\"}" << std::endl;
 }
 
 point_set_t* construct_sphere_dataset(point_set_t* skyline, const std::set<int>& final_dimensions){
@@ -111,24 +141,33 @@ point_set_t* copy_sphere_result_to_original(point_set_t* skyline, point_set_t* s
 
 //interactive version
 int main(int argc, char *argv[]){
-	if (argc != 7) return 0;
-	char* input = argv[1];
+	const bool experiment_mode = argc == 11 && std::string(argv[1]) == "--experiment";
+	if (!experiment_mode && argc != 7) return 0;
+	char* input = experiment_mode ? argv[2] : argv[1];
 	point_set_t* P = read_points(input);
 	int n = P->numberOfPoints;
 	linear_normalize(P);
 	// reduce_to_unit(P);
 	int d = P->points[0]->dim;
-	point_set_t* skyline = skyline_point(P);
+	point_set_t* skyline;
+	if (experiment_mode) {
+		skyline = alloc_point_set(P->numberOfPoints);
+		for (int i = 0; i < P->numberOfPoints; ++i) skyline->points[i] = P->points[i];
+	}
+	else {
+		skyline = skyline_point(P);
+	}
 	printf("number of skyline points: %d\n", skyline->numberOfPoints);
 
 	int size = 2; // question size
-	int d_prime = atoi(argv[2]); // number of dimensions in the utility vector
-	int d_hat = atoi(argv[3]); // number of dimensions in the cover in phase 1 (d_hat_1)
-	int d_hat_2 = atoi(argv[4]); // number of dimensions in the cover in phase 3, attribute subset method
+	int argument_offset = experiment_mode ? 1 : 0;
+	int d_prime = atoi(argv[2 + argument_offset]); // number of dimensions in the utility vector
+	int d_hat = atoi(argv[3 + argument_offset]); // number of dimensions in the cover in phase 1 (d_hat_1)
+	int d_hat_2 = atoi(argv[4 + argument_offset]); // number of dimensions in the cover in phase 3, attribute subset method
 	// int rounds = atoi(argv[5]); // number of random samples in attribute subset method
-	int K = atoi(argv[5]); // return size of the attribute subset method
+	int K = atoi(argv[5 + argument_offset]); // return size of the attribute subset method
 	int d_bar = 5;
-	int num_questions = atoi(argv[6]); // number of questions allowed
+	int num_questions = atoi(argv[6 + argument_offset]); // number of questions allowed
 	int num_quest_init = num_questions; // keep the initial amount of questions allowed
 	// below are default parameters from the interactive paper
 	//-------------------------------------
@@ -144,7 +183,22 @@ int main(int argc, char *argv[]){
 	//set n  to be the number of skyline points
 	n = skyline->numberOfPoints;
 
-	point_t* u = generate_sparse_utility(d, d_prime);
+	point_t* u;
+	bool skip_sphere = false;
+	if (experiment_mode) {
+		seed_experiment_random(static_cast<unsigned int>(std::stoul(argv[9])));
+		u = read_experiment_utility(argv[8], d);
+		skip_sphere = atoi(argv[10]) != 0;
+		if (u == nullptr) {
+			std::cerr << "Error: invalid utility file " << argv[8] << "\n";
+			release_point_set(skyline, false);
+			release_point_set(P, true);
+			return 2;
+		}
+	}
+	else {
+		u = generate_sparse_utility(d, d_prime);
+	}
 
 	highdim_output* h = interactive_highdim(skyline, size, d_bar, d_hat, d_hat_2, u, K, s, epsilon, maxRound, Qcount, Csize, cmp_option, stop_option, prune_option, dom_option, num_questions);
 	double time_12 = h->time_12;
@@ -172,12 +226,16 @@ int main(int argc, char *argv[]){
 	print_separator();
 	double mrr = evaluateLP(skyline, S, 0, u);
 	printf("|%7s |%13.3lf |%5.2lf | %5d |\n", "OurAlg", mrr, time_12+time_3, S->numberOfPoints);
+	int questions_used = num_quest_init-num_questions;
+	if (experiment_mode) {
+		print_experiment_result("FHDR", mrr, time_12+time_3, S->numberOfPoints, questions_used);
+	}
 
 	// for comparison, test the mrr returned by the Sphere algorithm
 	// construct the dataset with the final dimensions
 	point_set_t* D_test = construct_sphere_dataset(skyline, final_dimensions);
 	// record the time in seconds
-	if (final_dimensions.size() <= K_sphere){
+	if (!skip_sphere && final_dimensions.size() <= K_sphere){
 		auto start_time_sphere = std::chrono::high_resolution_clock::now();
 		point_set_t* skyline_D_test = skyline_point(D_test);
 		point_set_t* S_test = sphereWSImpLP(skyline_D_test, K_sphere);
@@ -190,10 +248,18 @@ int main(int argc, char *argv[]){
 		
 		print_separator();
 		printf("|%7s |%13.3lf |%5.2lf | %5d |\n", "Sphere", mrr_test, time_12+time_sphere, S_test->numberOfPoints);
+		if (experiment_mode) {
+			print_experiment_result("Sphere-Adapt", mrr_test, time_12+time_sphere,
+				S_test->numberOfPoints, questions_used);
+		}
 	    
 		release_point_set(skyline_D_test, false);
 		release_point_set(S_test, false); // Don't clear since points are references
 		release_point_set(S_test_original, true);
+	}
+	else if (experiment_mode) {
+		print_unavailable_experiment_result("Sphere-Adapt",
+			skip_sphere ? "skipped_by_experiment_policy" : "candidate_dimension_count_exceeds_output_size");
 	}
 	
 	
@@ -204,7 +270,7 @@ int main(int argc, char *argv[]){
 	// We need to find the points in skyline_D_test that have those IDs
 	
 	print_separator();
-	printf("number of questions: %d\n", num_quest_init-num_questions); // 555
+	printf("number of questions: %d\n", questions_used); // 555
 
 	release_point_set(skyline, false);
 	release_point(u);

@@ -1,4 +1,5 @@
 #include "highdim.h"
+#include "experiment_random.h"
 
 namespace {
 
@@ -32,13 +33,10 @@ point_set_t* project_points(point_set_t* source, const std::vector<int>& dimensi
 
 point_set_t* select_random_points(point_set_t* D, int size){
     point_set_t* S = alloc_point_set(size);
-    // create a random number generator
-    std::random_device rd;
-    std::mt19937 gen(rd());
     std::uniform_int_distribution<int> dis(0, D->numberOfPoints-1);
     // select size points from D
     for (int i = 0; i < size; ++i) {
-        int idx = dis(gen);
+        int idx = dis(experiment_random_generator());
         S->points[i] = D->points[idx];
     }
     return S;
@@ -420,4 +418,3 @@ highdim_output* interactive_highdim(point_set_t* skyline, int size, int d_bar, i
     release_point(u_final);
     return output;
 }
-

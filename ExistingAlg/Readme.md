@@ -30,3 +30,13 @@ Example:
 ```sh
 ./build/ExistingAlg 1 util e100-10k.txt 3 1 30 1.0
 ```
+
+The repository-level experiment runner also uses a single-trial machine interface:
+
+```sh
+./build/ExistingAlg --experiment INPUT D_PRIME W MAXROUND EPSILON UTILITY_FILE
+```
+
+This mode reads the exact utility vector from `UTILITY_FILE`, applies the same
+normalization as FHDR, and emits a full-precision `EXPERIMENT_RESULT` record. It is
+intended for `experiments/run.py`; the positional interface above remains supported.

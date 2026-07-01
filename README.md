@@ -53,3 +53,51 @@ To run the algorithm in the paper 'High-dimensional Regret Minimization', use
 For example, "./run datasets/e100-10k.txt 3 7 6 1 35" will run the algorithm on synthetic dataset of n=10k, d=100, with 35 questions allowed and output size 1. The output also contains results from _Sphere-Adapt_ (as introduced in our paper) for comparison, if it can be executed normally.
 
 Note that due to the size limit of Github, the standard synthetic dataset used in our experiments (n=100k, d=100) is not provided. 
+
+## End-to-end experiments
+
+Prerequisites are GLPK, CMake, Python 3.10 or newer, and Gnuplot. Run one experiment with:
+
+```sh
+python3 experiments/run.py \
+  --part <p1|p2|internal> \
+  --vary <parameter> \
+  --dataset <dataset> \
+  --runs <number-of-trials> \
+  --run-id <result-name>
+```
+
+Datasets are `synthetic`, `house`, `car`, `nba`, and `energy`. Parameters are:
+
+- P1: `d_int`, `n`, `d`
+- P2: `d_int`, `K`, `q`, `n`, `d`
+- Internal: `m`, `w`
+
+Examples:
+
+```sh
+# P2 on Car, varying K, with 100 trials per value
+python3 experiments/run.py --part p2 --vary K --dataset car \
+  --runs 100 --run-id p2-car-k
+
+# Small P1 validation run
+python3 experiments/run.py --part p1 --vary d_int --dataset synthetic \
+  --runs 2 --run-id smoke
+
+# Internal parameter experiment
+python3 experiments/run.py --part internal --vary m --dataset nba \
+  --runs 100 --run-id internal-m
+```
+
+The default is 100 trials. Reusing the same `--run-id` resumes an interrupted run.
+Use a different run ID when changing the trial count, seed, or timeout. To regenerate
+plots from completed results without rerunning algorithms, add `--plot-only`.
+
+Results are written to:
+
+```text
+results/<run-id>/<part>/<dataset>/vary_<parameter>/
+```
+
+The runner also writes `.dat` files under `plot/`, invokes the existing `.gnu` script,
+and generates EPS and PDF plots. Run `python3 experiments/run.py --help` for all options.

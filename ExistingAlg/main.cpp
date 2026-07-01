@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iomanip>
 #include <iterator>
 #include <memory>
 #include <numeric>
@@ -25,6 +26,7 @@ constexpr const char *kAlgorithm = "util";
 
 struct Config
 {
+    bool experiment_mode;
     int repeats;
     std::string algorithm;
     fs::path input_argument;
@@ -33,6 +35,7 @@ struct Config
     int return_size;
     int max_rounds;
     double epsilon;
+    fs::path utility_path;
 };
 
 struct Summary
@@ -122,19 +125,24 @@ fs::path resolve_input(const fs::path &requested, const fs::path &repository_roo
 
 Config parse_config(int argc, char *argv[], const fs::path &repository_root)
 {
+    const bool experiment_mode = argc == 8 && std::string(argv[1]) == "--experiment";
     if (argc != 1 && argc != 8)
         throw std::invalid_argument("invalid argument count");
 
-    const fs::path input_argument = argc == 1 ? "e100-10k.txt" : argv[3];
+    const fs::path input_argument = argc == 1 ? "e100-10k.txt" :
+        (experiment_mode ? fs::path(argv[2]) : fs::path(argv[3]));
     Config config{};
-    config.repeats = argc == 1 ? 100 : std::stoi(argv[1]);
-    config.algorithm = argc == 1 ? kAlgorithm : argv[2];
+    config.experiment_mode = experiment_mode;
+    config.repeats = argc == 1 ? 100 : (experiment_mode ? 1 : std::stoi(argv[1]));
+    config.algorithm = argc == 1 || experiment_mode ? kAlgorithm : argv[2];
     config.input_argument = input_argument;
     config.input_path = resolve_input(input_argument, repository_root);
-    config.utility_dimensions = argc == 1 ? 3 : std::stoi(argv[4]);
-    config.return_size = argc == 1 ? 1 : std::stoi(argv[5]);
-    config.max_rounds = argc == 1 ? 30 : std::stoi(argv[6]);
-    config.epsilon = argc == 1 ? 1.0 : std::stod(argv[7]);
+    config.utility_dimensions = argc == 1 ? 3 : std::stoi(argv[experiment_mode ? 3 : 4]);
+    config.return_size = argc == 1 ? 1 : std::stoi(argv[experiment_mode ? 4 : 5]);
+    config.max_rounds = argc == 1 ? 30 : std::stoi(argv[experiment_mode ? 5 : 6]);
+    config.epsilon = argc == 1 ? 1.0 : std::stod(argv[experiment_mode ? 6 : 7]);
+    if (experiment_mode)
+        config.utility_path = argv[7];
 
     if (config.repeats <= 0 || config.algorithm != kAlgorithm ||
         config.utility_dimensions <= 0 || config.return_size <= 0 ||
@@ -165,17 +173,34 @@ OwnedPointSet read_points(const fs::path &path)
     return points;
 }
 
-bool strictly_dominates(const point_t *first, const point_t *second)
+void linear_normalize(point_set_t *points)
 {
-    bool strictly_better = false;
+    const int dimension = points->points[0]->dim;
+    for (int column = 0; column < dimension; ++column)
+    {
+        double minimum = points->points[0]->coord[column];
+        double maximum = minimum;
+        for (int row = 1; row < points->numberOfPoints; ++row)
+        {
+            minimum = std::min(minimum, points->points[row]->coord[column]);
+            maximum = std::max(maximum, points->points[row]->coord[column]);
+        }
+        for (int row = 0; row < points->numberOfPoints; ++row)
+        {
+            points->points[row]->coord[column] = maximum == minimum ? 0.0 :
+                (points->points[row]->coord[column] - minimum) / (maximum - minimum);
+        }
+    }
+}
+
+bool dominates(const point_t *first, const point_t *second)
+{
     for (int dimension = 0; dimension < first->dim; ++dimension)
     {
         if (first->coord[dimension] < second->coord[dimension])
             return false;
-        strictly_better = strictly_better ||
-                          first->coord[dimension] > second->coord[dimension];
     }
-    return strictly_better;
+    return true;
 }
 
 PointSetView skyline(const point_set_t *input)
@@ -187,12 +212,12 @@ PointSetView skyline(const point_set_t *input)
         bool dominated = false;
         for (auto existing = candidates.begin(); existing != candidates.end();)
         {
-            if (strictly_dominates(*existing, candidate))
+            if (dominates(*existing, candidate))
             {
                 dominated = true;
                 break;
             }
-            existing = strictly_dominates(candidate, *existing)
+            existing = dominates(candidate, *existing)
                            ? candidates.erase(existing)
                            : std::next(existing);
         }
@@ -202,6 +227,13 @@ PointSetView skyline(const point_set_t *input)
 
     PointSetView result(alloc_point_set(static_cast<int>(candidates.size())));
     std::copy(candidates.begin(), candidates.end(), result->points);
+    return result;
+}
+
+PointSetView all_points_view(point_set_t *input)
+{
+    PointSetView result(alloc_point_set(input->numberOfPoints));
+    std::copy(input->points, input->points + input->numberOfPoints, result->points);
     return result;
 }
 
@@ -241,6 +273,18 @@ PointPtr generate_utility(int dimension, int nonzero_dimensions, std::mt19937 &g
     return utility;
 }
 
+PointPtr read_utility(const fs::path &path, int dimension)
+{
+    std::ifstream input(path);
+    PointPtr utility(alloc_point(dimension));
+    for (int index = 0; index < dimension; ++index)
+    {
+        if (!(input >> utility->coord[index]))
+            throw std::runtime_error("invalid utility file: " + path.string());
+    }
+    return utility;
+}
+
 void set_best_score(const std::vector<point_t *> &top, const point_t *utility)
 {
     best_score = dot_prod(utility, top[0]);
@@ -255,14 +299,19 @@ Summary run_experiment(const Config &config, point_set_t *points, std::ostream &
 
     std::mt19937 generator(std::random_device{}());
     const int dimension = points->points[0]->dim;
+    PointPtr fixed_utility = config.experiment_mode
+        ? read_utility(config.utility_path, dimension)
+        : PointPtr(nullptr);
     for (int round = 0; round < config.repeats; ++round)
     {
         output << "round " << round << '\n';
-        PointPtr utility = generate_utility(
-            dimension, config.utility_dimensions, generator);
-        const auto top = top_points(points, utility.get(), 2);
-        set_best_score(top, utility.get());
-        utilityapprox(points, utility.get(), kQuestionSize, config.epsilon,
+        PointPtr generated_utility = config.experiment_mode
+            ? PointPtr(nullptr)
+            : generate_utility(dimension, config.utility_dimensions, generator);
+        point_t *utility = config.experiment_mode ? fixed_utility.get() : generated_utility.get();
+        const auto top = top_points(points, utility, 2);
+        set_best_score(top, utility);
+        utilityapprox(points, utility, kQuestionSize, config.epsilon,
                       config.max_rounds, config.return_size, kTheta);
     }
 
@@ -289,21 +338,32 @@ int main(int argc, char *argv[])
     {
         if (argc != 1 && argc != 8)
             throw std::invalid_argument("invalid argument count");
-        const fs::path requested_input = argc == 1 ? "e100-10k.txt" : argv[3];
+        const bool experiment_mode = argc == 8 && std::string(argv[1]) == "--experiment";
+        const fs::path requested_input = argc == 1 ? "e100-10k.txt" :
+            (experiment_mode ? fs::path(argv[2]) : fs::path(argv[3]));
         const fs::path repository_root = locate_repository_root(argv[0], requested_input);
         const Config config = parse_config(argc, argv, repository_root);
 
-        const fs::path results_dir = repository_root / "ExistingAlg" / "results";
-        fs::create_directories(results_dir);
-        const fs::path result_path = results_dir /
-            ("_" + config.algorithm + "_" + config.input_argument.filename().string() + "_" +
-             std::to_string(config.repeats) + ".txt");
-        std::ofstream output(result_path);
-        if (!output)
-            throw std::runtime_error("cannot create result file: " + result_path.string());
+        std::ofstream result_output;
+        std::ostream *output = &std::cout;
+        if (!config.experiment_mode)
+        {
+            const fs::path results_dir = repository_root / "ExistingAlg" / "results";
+            fs::create_directories(results_dir);
+            const fs::path result_path = results_dir /
+                ("_" + config.algorithm + "_" + config.input_argument.filename().string() + "_" +
+                 std::to_string(config.repeats) + ".txt");
+            result_output.open(result_path);
+            if (!result_output)
+                throw std::runtime_error("cannot create result file: " + result_path.string());
+            output = &result_output;
+        }
 
         OwnedPointSet all_points = read_points(config.input_path);
-        PointSetView points = skyline(all_points.get());
+        linear_normalize(all_points.get());
+        PointSetView points = config.experiment_mode
+            ? all_points_view(all_points.get())
+            : skyline(all_points.get());
         if (points->numberOfPoints < 2)
             throw std::runtime_error("UtilityApprox requires at least two skyline points");
 
@@ -311,9 +371,16 @@ int main(int argc, char *argv[])
             throw std::runtime_error("D_PRIME exceeds the dataset dimension");
 
         std::cout << config.input_path << '\n' << config.algorithm << '\n';
-        const Summary summary = run_experiment(config, points.get(), output);
+        const Summary summary = run_experiment(config, points.get(), *output);
         write_summary(std::cout, summary);
-        write_summary(output, summary);
+        if (!config.experiment_mode)
+            write_summary(result_output, summary);
+        else
+            std::cout << "EXPERIMENT_RESULT {\"method\":\"UtilityApprox\",\"status\":\"ok\""
+                      << ",\"regret_ratio\":" << std::setprecision(17) << summary.average_regret_ratio
+                      << ",\"time_seconds\":" << summary.average_time
+                      << ",\"output_size\":" << summary.average_return_size
+                      << ",\"questions\":" << summary.average_questions << "}" << std::endl;
         return 0;
     }
     catch (const std::invalid_argument &)

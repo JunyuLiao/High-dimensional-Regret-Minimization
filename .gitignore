@@ -4,6 +4,7 @@ output/
 real/
 plot/
 result/
+results/
 scal_1/
 scal_2/
 plot_old/
@@ -55,6 +56,8 @@ venv/
 *.exe
 run
 run_debug
+generate_uniform
+prepare_dataset
 *.dSYM
 
 # Jupyter Notebook checkpoints
@@ -84,4 +87,4 @@ run.dSYM/
 run.dSYM.ziprun
 run.dSYM.zip
 
-# 
+#

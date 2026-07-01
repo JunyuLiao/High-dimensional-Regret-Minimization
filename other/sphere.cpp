@@ -371,8 +371,15 @@ point_set_t* sphereWSImpLP(point_set_t* point_set, int k)
 	}
 	if (max == NULL)
 	{
-		printf("Error: max is NULL\n");
-		exit(0);
+		// The current basis already has zero regret. Match the normal
+		// termination path by padding the remaining output positions.
+		for (int j = count; j < k; ++j)
+			result->points[j] = result->points[0];
+		delete[] rr;
+		delete[] active;
+		delete[] b_value;
+		release_point_set(directions, true);
+		return result;
 	}
 	result->points[count++] = max;
 	lastRound_max = max;

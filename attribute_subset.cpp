@@ -1,4 +1,5 @@
 #include "attribute_subset.h"
+#include "experiment_random.h"
 #include <algorithm>
 #include <iostream>
 using namespace std;
@@ -115,8 +116,7 @@ point_set_t* attribute_subset(point_set_t* skyline, point_set_t* S_output, int f
         printf("error: final_d < d_hat_2\n");
         exit(1);
     }
-    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-    std::mt19937 generator(seed);
+    std::mt19937& generator = experiment_random_generator();
     std::uniform_int_distribution<int> distribution(0, final_d-1);
     int k = d_hat_2 + 1;
     int num_rounds = 0;
